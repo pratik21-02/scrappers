@@ -26,7 +26,6 @@ st.markdown('<p class="sub-header">Upload Seat Number PDFs to Auto-Generate Sort
 # --- APP LOGIC ---
 URL = "https://mkbhavuni.edu.in/bhavuni_result/result.php"
 
-# File Uploader - Removed specific department restriction
 uploaded_files = st.file_uploader("Upload PDF Files (Any Department / Course)", type="pdf", accept_multiple_files=True)
 
 if uploaded_files:
@@ -42,10 +41,9 @@ if uploaded_files:
                 for page in pdf_reader.pages:
                     full_text += page.extract_text() + " "
                 
-                # Dynamic Course Name Detection from Filename
+                # Dynamic Course Name Detection
                 f_low = file.name.lower()
                 course = "Department"
-                
                 if "botany" in f_low: course = "Botany"
                 elif "zoology" in f_low: course = "Zoology"
                 elif "microbiology" in f_low: course = "Microbiology"
@@ -55,39 +53,28 @@ if uploaded_files:
                 elif "b.com" in f_low: course = "B.Com"
                 elif "b.a" in f_low: course = "B.A"
                 elif "b.sc" in f_low: course = "B.Sc"
+                elif "m.sc" in f_low or "msc" in f_low: course = "M.Sc"
                 else:
-                    # Extracts first word of filename if department unknown
                     clean_name = re.sub(r'[^a-zA-Z\s]', '', file.name.replace('.pdf', ''))
                     words = clean_name.split()
-                    if words:
-                        course = words[0].capitalize()
+                    if words: course = words[0].capitalize()
 
-                # --- SUPER SMART EXTRACTION LOGIC ---
-                # Pehle wala logic fail ho raha tha kiyunki PDF mein random numbers (like date, subject code) 
-                # aane se Seat aur SID ki pair galat ho rahi thi. Ab hum 100% accurate proximity search use karenge!
-                
-                # Saare spaces aur next-lines ko theek karein
+                # SMART EXTRACTION LOGIC
                 clean_text = re.sub(r'\s+', ' ', full_text)
                 
-                # 1. Sabse pehle SID dhundhe (10-14 digits) kiyunki ye sabse unique hota hai
+                # 1. Find SID (10 to 14 digits)
                 sid_matches = list(re.finditer(r'\b\d{10,14}\b', clean_text))
                 
                 for sid_match in sid_matches:
                     sid = sid_match.group()
                     start_pos = sid_match.start()
                     
-                    # 2. SID ke theek peeche (150 letters ke andar) hum Seat Number dhundhenge
-                    # Is area mein Student ka naam aur gender hota hai, aur uske pehle exact Seat No!
+                    # 2. Find Seat No nearby (6 to 8 digits)
                     search_area = clean_text[max(0, start_pos - 150):start_pos]
-                    
-                    # 3. 6 se 8 digit wala number dhoondhein
                     seat_matches = re.findall(r'\b\d{6,8}\b', search_area)
                     
                     if seat_matches:
-                        # Jo number SID ke sabse kareeb (last) mila, wahi Seat No hai
                         seat_no = seat_matches[-1] 
-                        
-                        # Prevent duplicates
                         if not any(s['seat'] == seat_no for s in extracted_students):
                             extracted_students.append({"seat": seat_no, "sid": sid, "course": course})
 
@@ -103,12 +90,9 @@ if uploaded_files:
             status_text = st.empty()
             
             results_data = []
-            
-            # --- CONNECTION STABILITY FIX ---
-            # Session use karne se website hume bot (hacker) nahi samjhegi aur connection cut nahi karegi
             session = requests.Session()
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
             
@@ -117,32 +101,25 @@ if uploaded_files:
                 sid = student['sid']
                 course = student['course']
                 
-                # Update progress
                 progress = int(((idx) / total_students) * 100)
                 progress_bar.progress(progress)
                 status_text.text(f"Fetching result for {course} Seat: {seat_no} ({idx+1}/{total_students})")
                 
                 try:
-                    payload = {
-                        'sid': sid,
-                        'seat_no': seat_no,
-                        'search_seat_no': 'View Result'
-                    }
+                    payload = { 'sid': sid, 'seat_no': seat_no, 'search_seat_no': 'View Result' }
                     
-                    # Request with AUTO-RETRY (Server load zyada ho tab bhi kaam karega)
                     response = None
-                    for attempt in range(2): # 2 baar try karega fail hone par
+                    for attempt in range(2):
                         try:
                             response = session.post(URL, data=payload, headers=headers, timeout=15)
-                            if response.status_code == 200:
-                                break
+                            if response.status_code == 200: break
                         except requests.exceptions.RequestException:
-                            time.sleep(1.5) # Error aane par 1.5 seconds ruk kar retry
+                            time.sleep(1.5)
                     
                     if response and response.status_code == 200:
                         soup = BeautifulSoup(response.text, 'html.parser')
                         
-                        # Find Name
+                        # Extract Name
                         name_label = soup.find(string=re.compile(r"Student Name", re.IGNORECASE))
                         if name_label:
                             name_node = name_label.find_next('td')
@@ -150,8 +127,9 @@ if uploaded_files:
                         else:
                             name = "Name Not Found"
                             
-                        # Find Marks
+                        # Extract Marks & Status
                         total_label = soup.find(lambda tag: tag.name in ['td', 'th'] and tag.text and "GRAND TOTAL" in tag.text.upper())
+                        
                         percentage_val = 0.0
                         percentage_str = "N/A"
                         marks_string = "N/A"
@@ -161,10 +139,8 @@ if uploaded_files:
                             row = total_label.find_parent('tr')
                             cells = [c.text.strip() for c in row.find_all(['td', 'th']) if c.text.strip()]
                             
-                            # --- SMART STATUS & MARKS SEPARATION ---
-                            # Rule numbers (e.g. RESERVED U.ST.114) se confusion bachane ke liye:
+                            # Identify Status properly
                             status_keywords = ["PASS", "FAIL", "ATKT", "ABSENT", "RESERVED", "WITHHELD", "U.F.M", "U.ST", "WH", "W.H."]
-                            
                             found_status_idx = -1
                             for i, cell in enumerate(cells):
                                 if any(kw in cell.upper() for kw in status_keywords):
@@ -173,12 +149,12 @@ if uploaded_files:
                                     
                             if found_status_idx != -1:
                                 result_status = " ".join(cells[found_status_idx:])
-                                marks_cells = cells[1:found_status_idx] # Status se pehle ke cells
+                                marks_cells = cells[1:found_status_idx] 
                             else:
                                 result_status = cells[-1] if len(cells) > 0 else "Unknown"
                                 marks_cells = cells[1:-1]
                                 
-                            # Ab sirf "marks_cells" mein se numbers nikalenge
+                            # Extract Numbers for Marks
                             middle_text = " ".join(marks_cells)
                             nums = [int(n) for n in re.findall(r'\b\d+\b', middle_text)]
                             
@@ -186,22 +162,26 @@ if uploaded_files:
                                 obtained = nums[-2]
                                 maximum = nums[-1]
                                 
-                                # Logic Check: Total marks humesha obtained se zyada hone chahiye
-                                if maximum > 0 and obtained <= maximum:
+                                if maximum > 0:
                                     percentage_val = (obtained / maximum) * 100
-                                    percentage_str = f"{round(percentage_val, 2)}%"
-                                    marks_string = f"{obtained} / {maximum}"
-                                else:
-                                    marks_string = f"{obtained} / ?" # Fallback for unexpected format
-                            elif len(nums) == 1:
-                                marks_string = f"{nums[0]} / ?"
+                                    
+                                    # --- BUG FIX LOGIC ---
+                                    # Agar RESERVED hai, ABSENT hai, ya galti se 100% se zyada chala gaya (e.g. 421%)
+                                    # Toh isko "N/A" karke list me sabse last bhej do!
+                                    if percentage_val > 100 or any(kw in result_status.upper() for kw in ["RESERVED", "U.ST", "ABSENT", "U.F.M", "WITHHELD"]):
+                                        percentage_val = -1.0 # This ensures they go to the bottom of the list
+                                        percentage_str = "N/A"
+                                        marks_string = "N/A"
+                                    else:
+                                        percentage_str = f"{round(percentage_val, 2)}%"
+                                        marks_string = f"{obtained} / {maximum}"
                         
                         results_data.append({
                             "Seat No": seat_no,
                             "Course": course,
                             "Name": name,
                             "Marks": marks_string,
-                            "Percentage": percentage_val,  # Used for sorting
+                            "Percentage": percentage_val,  
                             "Percentage Str": percentage_str,
                             "Status": result_status
                         })
@@ -211,7 +191,7 @@ if uploaded_files:
                 except Exception as e:
                     st.error(f"Error fetching {seat_no}: {str(e)}")
                 
-                time.sleep(0.8) # Badhaya gaya delay taaki MKBU server block na kare
+                time.sleep(0.8) # Delay to prevent server block
             
             progress_bar.progress(100)
             status_text.text("All results fetched successfully!")
@@ -220,15 +200,12 @@ if uploaded_files:
             if results_data:
                 st.markdown("---")
                 
-                # Convert to DataFrame and Sort
                 df = pd.DataFrame(results_data)
                 df = df.sort_values(by="Percentage", ascending=False).reset_index(drop=True)
-                df['Rank'] = df.index + 1 # Rank (1, 2, 3...)
+                df['Rank'] = df.index + 1
                 
-                # 3.1 HTML UI GENERATOR
                 html_rows = ""
                 for idx, row in df.iterrows():
-                    # Dynamic colors based on first letter of course (to look colorful for any dept)
                     dept_colors = ["bg-blue-100 text-blue-800", "bg-purple-100 text-purple-800", "bg-pink-100 text-pink-800", "bg-green-100 text-green-800", "bg-orange-100 text-orange-800"]
                     color_idx = len(row['Course']) % len(dept_colors)
                     dept_color = dept_colors[color_idx]
@@ -239,7 +216,10 @@ if uploaded_files:
                     else: icon = "fas fa-exclamation-circle text-yellow-500"
                         
                     rank = row['Rank']
-                    if rank == 1: rank_display = '<span class="text-yellow-500 text-xl" title="Rank 1"><i class="fas fa-trophy"></i> 1</span>'
+                    # Agar bande ka error hai (N/A) toh rank mat dikhao, seedha '-' dikhao
+                    if row['Percentage Str'] == "N/A":
+                        rank_display = '<span class="font-bold text-gray-400 text-lg">-</span>'
+                    elif rank == 1: rank_display = '<span class="text-yellow-500 text-xl" title="Rank 1"><i class="fas fa-trophy"></i> 1</span>'
                     elif rank == 2: rank_display = '<span class="text-gray-400 text-xl" title="Rank 2"><i class="fas fa-medal"></i> 2</span>'
                     elif rank == 3: rank_display = '<span class="text-orange-400 text-xl" title="Rank 3"><i class="fas fa-medal"></i> 3</span>'
                     else: rank_display = f'<span class="font-bold text-gray-600 text-lg">#{rank}</span>'
@@ -307,12 +287,10 @@ if uploaded_files:
                 </body>
                 </html>"""
 
-                # 3.2 Embed custom HTML directly inside Streamlit
                 import streamlit.components.v1 as components
                 st.subheader("🏆 Your Custom Dashboard")
                 components.html(html_template, height=600, scrolling=True)
                 
-                # 3.3 Download Buttons for PDF & Excel
                 st.markdown("### 📥 Download Options")
                 col1, col2 = st.columns(2)
                 
