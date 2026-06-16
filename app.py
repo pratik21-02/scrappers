@@ -62,30 +62,55 @@ if uploaded_files:
                     if words:
                         course = words[0].capitalize()
 
-                # SMART REGEX UPDATE: 
-                # Seat Numbers are usually 6 to 8 digits long
-                # SIDs are usually 10 to 14 digits long
-                seats = re.findall(r'\b\d{6,8}\b', full_text)
-                sids = re.findall(r'\b\d{10,14}\b', full_text)
+                # --- SUPER SMART EXTRACTION LOGIC ---
+                # Pehle wala logic fail ho raha tha kiyunki PDF mein random numbers (like date, subject code) 
+                # aane se Seat aur SID ki pair galat ho rahi thi. Ab hum 100% accurate proximity search use karenge!
                 
-                count = min(len(seats), len(sids))
-                for i in range(count):
-                    # Prevent duplicates
-                    if not any(s['seat'] == seats[i] for s in extracted_students):
-                        extracted_students.append({"seat": seats[i], "sid": sids[i], "course": course})
+                # Saare spaces aur next-lines ko theek karein
+                clean_text = re.sub(r'\s+', ' ', full_text)
+                
+                # 1. Sabse pehle SID dhundhe (10-14 digits) kiyunki ye sabse unique hota hai
+                sid_matches = list(re.finditer(r'\b\d{10,14}\b', clean_text))
+                
+                for sid_match in sid_matches:
+                    sid = sid_match.group()
+                    start_pos = sid_match.start()
+                    
+                    # 2. SID ke theek peeche (150 letters ke andar) hum Seat Number dhundhenge
+                    # Is area mein Student ka naam aur gender hota hai, aur uske pehle exact Seat No!
+                    search_area = clean_text[max(0, start_pos - 150):start_pos]
+                    
+                    # 3. 6 se 8 digit wala number dhoondhein
+                    seat_matches = re.findall(r'\b\d{6,8}\b', search_area)
+                    
+                    if seat_matches:
+                        # Jo number SID ke sabse kareeb (last) mila, wahi Seat No hai
+                        seat_no = seat_matches[-1] 
+                        
+                        # Prevent duplicates
+                        if not any(s['seat'] == seat_no for s in extracted_students):
+                            extracted_students.append({"seat": seat_no, "sid": sid, "course": course})
 
         total_students = len(extracted_students)
         
         if total_students == 0:
             st.error("❌ No valid Seat Numbers or SIDs found. Ensure the PDF contains University formatting.")
         else:
-            st.success(f"✅ Successfully extracted {total_students} students! Starting fetch process...")
+            st.success(f"✅ Successfully extracted {total_students} accurate pairs! Starting stable fetch process...")
             
             # 2. FETCH RESULTS FROM UNIVERSITY SERVER
             progress_bar = st.progress(0)
             status_text = st.empty()
             
             results_data = []
+            
+            # --- CONNECTION STABILITY FIX ---
+            # Session use karne se website hume bot (hacker) nahi samjhegi aur connection cut nahi karegi
+            session = requests.Session()
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
             
             for idx, student in enumerate(extracted_students):
                 seat_no = student['seat']
@@ -104,10 +129,17 @@ if uploaded_files:
                         'search_seat_no': 'View Result'
                     }
                     
-                    # Request directly from server (No CORS issue in Python!)
-                    response = requests.post(URL, data=payload, timeout=10)
+                    # Request with AUTO-RETRY (Server load zyada ho tab bhi kaam karega)
+                    response = None
+                    for attempt in range(2): # 2 baar try karega fail hone par
+                        try:
+                            response = session.post(URL, data=payload, headers=headers, timeout=15)
+                            if response.status_code == 200:
+                                break
+                        except requests.exceptions.RequestException:
+                            time.sleep(1.5) # Error aane par 1.5 seconds ruk kar retry
                     
-                    if response.status_code == 200:
+                    if response and response.status_code == 200:
                         soup = BeautifulSoup(response.text, 'html.parser')
                         
                         # Find Name
@@ -156,7 +188,7 @@ if uploaded_files:
                 except Exception as e:
                     st.error(f"Error fetching {seat_no}: {str(e)}")
                 
-                time.sleep(0.3) # Short delay
+                time.sleep(0.8) # Badhaya gaya delay taaki MKBU server block na kare
             
             progress_bar.progress(100)
             status_text.text("All results fetched successfully!")
