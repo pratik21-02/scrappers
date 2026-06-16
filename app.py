@@ -169,6 +169,14 @@ if uploaded_files:
                                 marks_string = "N/A"
                                 # result_status wahi rahega jo web se mila tha (Jaise "RESERVED U.ST.114")
                         
+                        # 🔒 DOUBLE SECURITY CHECK (Aakhiri hathiyar)
+                        # Agar percentage galti se 100 se upar hai YA status mein "RESERVED" / "U.ST" hai, toh direct N/A karo
+                        status_check = str(result_status).upper()
+                        if percentage_val > 100.0 or "RESERVED" in status_check or "U.ST" in status_check or "ABSENT" in status_check:
+                            percentage_val = -1.0
+                            percentage_str = "N/A"
+                            marks_string = "N/A"
+
                         results_data.append({
                             "Seat No": seat_no,
                             "Course": course,
