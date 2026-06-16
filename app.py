@@ -142,16 +142,14 @@ if uploaded_files:
                             result_status = cells[-1].upper() if cells else "UNKNOWN"
                             row_text_upper = " ".join(cells).upper()
                             
-                            # --- BUG FIX FOR RESERVED & U.ST ---
+                            # --- USER REQUESTED SMART FALLBACK LOGIC ---
                             held_keywords = ["RESERVED", "U.ST", "U.F.M", "ABSENT", "WITHHELD"]
                             is_held = any(kw in row_text_upper for kw in held_keywords)
                             
                             if is_held:
                                 marks_string = "N/A"
-                                percentage_val = 0.0
+                                percentage_val = -1.0  # -1 assign karne se seedha last me jayega
                                 percentage_str = "N/A"
-                                # Status ko theek se format karna taaki '114' marks me na jaye
-                                result_status = result_status if "RESERVED" in result_status or "U.ST" in result_status else "RESERVED/HELD"
                             else:
                                 # Normal Marks Calculation
                                 middle_cells = cells[1:-1] if len(cells) > 2 else cells[1:]
@@ -162,12 +160,17 @@ if uploaded_files:
                                     obtained = nums[-2]  # Second last number
                                     maximum = nums[-1]   # Last number
                                     
-                                    if maximum > 0 and obtained <= maximum:
-                                        percentage_val = (obtained / maximum) * 100
-                                        percentage_str = f"{round(percentage_val, 2)}%"
-                                        marks_string = f"{obtained} / {maximum}"
-                                    else:
-                                        marks_string = f"{obtained} / {maximum} (?)"
+                                    if maximum > 0:
+                                        calc_percent = (obtained / maximum) * 100
+                                        # Agar formatting error se >100% (jaise 421%) aye, toh usko N/A karke aakhir me phek do
+                                        if calc_percent > 100.0:
+                                            marks_string = "N/A"
+                                            percentage_val = -1.0  
+                                            percentage_str = "N/A"
+                                        else:
+                                            percentage_val = calc_percent
+                                            percentage_str = f"{round(percentage_val, 2)}%"
+                                            marks_string = f"{obtained} / {maximum}"
                         
                         results_data.append({
                             "Seat No": seat_no,
