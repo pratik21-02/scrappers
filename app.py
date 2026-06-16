@@ -61,14 +61,14 @@ if uploaded_files:
                 # SMART EXTRACTION LOGIC
                 clean_text = re.sub(r'\s+', ' ', full_text)
                 
-                # SID (10-14 digits) aur Seat No (6-8 digits) ka accurate match
+                # SID (10-14 digits)
                 sid_matches = list(re.finditer(r'\b\d{10,14}\b', clean_text))
                 
                 for sid_match in sid_matches:
                     sid = sid_match.group()
                     start_pos = sid_match.start()
                     
-                    # SID ke theek peechhe 150 characters mein Seat Number dhoondho
+                    # Search for Seat Number (6-8 digits) right behind SID
                     search_area = clean_text[max(0, start_pos - 150):start_pos]
                     seat_matches = re.findall(r'\b\d{6,8}\b', search_area)
                     
@@ -129,48 +129,45 @@ if uploaded_files:
                         # Find Marks & Status
                         total_label = soup.find(lambda tag: tag.name in ['td', 'th'] and tag.text and "GRAND TOTAL" in tag.text.upper())
                         
-                        percentage_val = 0.0
+                        # DEFAULT TO ERROR STATE (Will be sorted to the bottom)
+                        percentage_val = -1.0 
                         percentage_str = "N/A"
                         marks_string = "N/A"
-                        result_status = "Unknown"
+                        result_status = "UNKNOWN"
                         
                         if total_label:
-                            row = total_label.find_parent('tr')
-                            cells = [c.text.strip() for c in row.find_all(['td', 'th']) if c.text.strip()]
-                            
-                            # Last cell mein generally status hota hai (PASS/FAIL/RESERVED U.ST.114)
-                            result_status = cells[-1].upper() if cells else "UNKNOWN"
-                            row_text_upper = " ".join(cells).upper()
-                            
-                            # --- USER REQUESTED SMART FALLBACK LOGIC ---
-                            held_keywords = ["RESERVED", "U.ST", "U.F.M", "ABSENT", "WITHHELD"]
-                            is_held = any(kw in row_text_upper for kw in held_keywords)
-                            
-                            if is_held:
-                                marks_string = "N/A"
-                                percentage_val = -1.0  # -1 assign karne se seedha last me jayega
-                                percentage_str = "N/A"
-                            else:
-                                # Normal Marks Calculation
-                                middle_cells = cells[1:-1] if len(cells) > 2 else cells[1:]
-                                middle_text = " ".join(middle_cells)
-                                nums = [int(n) for n in re.findall(r'\d+', middle_text)]
+                            try:
+                                row = total_label.find_parent('tr')
+                                cells = [c.text.strip() for c in row.find_all(['td', 'th']) if c.text.strip()]
                                 
+                                result_status = cells[-1].upper() if cells else "UNKNOWN"
+                                
+                                # 💡 BULLETPROOF LOGIC: Agar ajeeb status hai, toh calculation fail kardo
+                                bad_keywords = ["RESERVED", "U.ST", "U.F.M", "ABSENT", "WITHHELD"]
+                                if any(kw in result_status for kw in bad_keywords) or any(kw in " ".join(cells).upper() for kw in bad_keywords):
+                                    raise ValueError("Reserved / Bad Status Found")
+                                
+                                nums = [int(n) for n in re.findall(r'\d+', " ".join(cells))]
                                 if len(nums) >= 2:
-                                    obtained = nums[-2]  # Second last number
-                                    maximum = nums[-1]   # Last number
+                                    obtained = nums[-2]
+                                    maximum = nums[-1]
                                     
                                     if maximum > 0:
-                                        calc_percent = (obtained / maximum) * 100
-                                        # Agar formatting error se >100% (jaise 421%) aye, toh usko N/A karke aakhir me phek do
-                                        if calc_percent > 100.0:
-                                            marks_string = "N/A"
-                                            percentage_val = -1.0  
-                                            percentage_str = "N/A"
-                                        else:
-                                            percentage_val = calc_percent
-                                            percentage_str = f"{round(percentage_val, 2)}%"
-                                            marks_string = f"{obtained} / {maximum}"
+                                        calc = (obtained / maximum) * 100
+                                        # 💡 BULLETPROOF LOGIC: Agar percentage 100 se upar gaya (jaise 421%), toh fail kardo
+                                        if calc > 100.0:
+                                            raise ValueError("Percentage > 100%")
+                                            
+                                        # Normal Pass/Fail Calculation
+                                        percentage_val = calc
+                                        percentage_str = f"{round(calc, 2)}%"
+                                        marks_string = f"{obtained} / {maximum}"
+                            except Exception as e:
+                                # Koi bhi error aaya (Reserved, 421%), sab N/A karke bottom pe daal do
+                                percentage_val = -1.0
+                                percentage_str = "N/A"
+                                marks_string = "N/A"
+                                # result_status wahi rahega jo web se mila tha (Jaise "RESERVED U.ST.114")
                         
                         results_data.append({
                             "Seat No": seat_no,
@@ -197,6 +194,7 @@ if uploaded_files:
                 st.markdown("---")
                 
                 df = pd.DataFrame(results_data)
+                # Sort by Percentage (Highest First). All errors (-1.0) will automatically go to the VERY BOTTOM.
                 df = df.sort_values(by="Percentage", ascending=False).reset_index(drop=True)
                 df['Rank'] = df.index + 1
                 
@@ -211,6 +209,7 @@ if uploaded_files:
                     else: icon = "fas fa-exclamation-circle text-yellow-500"
                         
                     rank = row['Rank']
+                    # Don't give medals to N/A students even if they are top of the bottom
                     if rank == 1 and row['Percentage'] > 0: rank_display = '<span class="text-yellow-500 text-xl" title="Rank 1"><i class="fas fa-trophy"></i> 1</span>'
                     elif rank == 2 and row['Percentage'] > 0: rank_display = '<span class="text-gray-400 text-xl" title="Rank 2"><i class="fas fa-medal"></i> 2</span>'
                     elif rank == 3 and row['Percentage'] > 0: rank_display = '<span class="text-orange-400 text-xl" title="Rank 3"><i class="fas fa-medal"></i> 3</span>'
