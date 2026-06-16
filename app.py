@@ -5,7 +5,6 @@ import pandas as pd
 import re
 import time
 import PyPDF2
-import io
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="MKBU Merit List Generator", page_icon="🎓", layout="wide")
@@ -22,13 +21,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<p class="main-header">🎓 MKBU Smart Merit App</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Upload Seat Number PDFs to Auto-Generate Sorted Merit Lists</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">Upload Seat Number PDFs to Auto-Generate Sorted Merit Lists (For ALL Departments)</p>', unsafe_allow_html=True)
 
 # --- APP LOGIC ---
 URL = "https://mkbhavuni.edu.in/bhavuni_result/result.php"
 
-# File Uploader
-uploaded_files = st.file_uploader("Upload PDF Files (Botany, Zoology, Microbiology)", type="pdf", accept_multiple_files=True)
+# File Uploader - Removed specific department restriction
+uploaded_files = st.file_uploader("Upload PDF Files (Any Department / Course)", type="pdf", accept_multiple_files=True)
 
 if uploaded_files:
     if st.button("🚀 Fetch Results & Generate Merit List", type="primary", use_container_width=True):
@@ -43,17 +42,31 @@ if uploaded_files:
                 for page in pdf_reader.pages:
                     full_text += page.extract_text() + " "
                 
-                # Determine Course
-                t_low = full_text.lower()
+                # Dynamic Course Name Detection from Filename
                 f_low = file.name.lower()
-                course = "Unknown"
-                if "botany" in t_low or "botany" in f_low: course = "Botany"
-                elif "zoology" in t_low or "zoology" in f_low: course = "Zoology"
-                elif "microbiology" in t_low or "microbiology" in f_low: course = "Microbiology"
+                course = "Department"
                 
-                # Regex to find Seat Nos and SIDs
-                seats = re.findall(r'\b26\d{6}\b', full_text)
-                sids = re.findall(r'\b51\d{8}\b', full_text)
+                if "botany" in f_low: course = "Botany"
+                elif "zoology" in f_low: course = "Zoology"
+                elif "microbiology" in f_low: course = "Microbiology"
+                elif "chemistry" in f_low: course = "Chemistry"
+                elif "physics" in f_low: course = "Physics"
+                elif "math" in f_low: course = "Mathematics"
+                elif "b.com" in f_low: course = "B.Com"
+                elif "b.a" in f_low: course = "B.A"
+                elif "b.sc" in f_low: course = "B.Sc"
+                else:
+                    # Extracts first word of filename if department unknown
+                    clean_name = re.sub(r'[^a-zA-Z\s]', '', file.name.replace('.pdf', ''))
+                    words = clean_name.split()
+                    if words:
+                        course = words[0].capitalize()
+
+                # SMART REGEX UPDATE: 
+                # Seat Numbers are usually 6 to 8 digits long
+                # SIDs are usually 10 to 14 digits long
+                seats = re.findall(r'\b\d{6,8}\b', full_text)
+                sids = re.findall(r'\b\d{10,14}\b', full_text)
                 
                 count = min(len(seats), len(sids))
                 for i in range(count):
@@ -64,9 +77,9 @@ if uploaded_files:
         total_students = len(extracted_students)
         
         if total_students == 0:
-            st.error("No valid Seat Numbers or SIDs found in the uploaded PDFs.")
+            st.error("❌ No valid Seat Numbers or SIDs found. Ensure the PDF contains University formatting.")
         else:
-            st.success(f"Successfully extracted {total_students} students! Starting fetch process...")
+            st.success(f"✅ Successfully extracted {total_students} students! Starting fetch process...")
             
             # 2. FETCH RESULTS FROM UNIVERSITY SERVER
             progress_bar = st.progress(0)
@@ -157,10 +170,13 @@ if uploaded_files:
                 df = df.sort_values(by="Percentage", ascending=False).reset_index(drop=True)
                 df['Rank'] = df.index + 1 # Rank (1, 2, 3...)
                 
-                # 3.1 HTML UI GENERATOR (Aapki pasand ka sundar design)
+                # 3.1 HTML UI GENERATOR
                 html_rows = ""
                 for idx, row in df.iterrows():
-                    dept_color = "bg-orange-100 text-orange-800" if row['Course'] == 'Zoology' else ("bg-purple-100 text-purple-800" if row['Course'] == 'Microbiology' else "bg-green-100 text-green-800")
+                    # Dynamic colors based on first letter of course (to look colorful for any dept)
+                    dept_colors = ["bg-blue-100 text-blue-800", "bg-purple-100 text-purple-800", "bg-pink-100 text-pink-800", "bg-green-100 text-green-800", "bg-orange-100 text-orange-800"]
+                    color_idx = len(row['Course']) % len(dept_colors)
+                    dept_color = dept_colors[color_idx]
                     
                     status = str(row['Status']).upper()
                     if "PASS" in status: icon = "fas fa-check-circle text-green-500"
@@ -174,15 +190,15 @@ if uploaded_files:
                     else: rank_display = f'<span class="font-bold text-gray-600 text-lg">#{rank}</span>'
 
                     html_rows += f"""
-                    <tr class="hover:bg-blue-50 transition-colors">
-                        <td class="p-4 text-center border-b border-gray-100">{rank_display}</td>
-                        <td class="p-4 w-10 text-center border-b border-gray-100"><i class="{icon}" title="{status}"></i></td>
-                        <td class="p-4 border-b border-gray-100"><span class="px-2 py-1 rounded-full text-xs font-semibold {dept_color}">{row['Course']}</span></td>
-                        <td class="p-4 font-mono text-sm text-gray-600 border-b border-gray-100">{row['Seat No']}</td>
-                        <td class="p-4 font-medium text-gray-900 border-b border-gray-100">{row['Name']}</td>
-                        <td class="p-4 font-bold text-gray-900 border-b border-gray-100">{row['Marks']}</td>
-                        <td class="p-4 font-semibold text-blue-600 border-b border-gray-100">{row['Percentage Str']}</td>
-                        <td class="p-4 font-medium text-gray-700 border-b border-gray-100">{status}</td>
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="p-3 text-center border-b border-gray-200">{rank_display}</td>
+                        <td class="p-3 w-10 text-center border-b border-gray-200"><i class="{icon}" title="{status}"></i></td>
+                        <td class="p-3 border-b border-gray-200"><span class="px-3 py-1 rounded-full text-xs font-bold {dept_color} shadow-sm">{row['Course']}</span></td>
+                        <td class="p-3 font-mono text-sm text-gray-600 border-b border-gray-200">{row['Seat No']}</td>
+                        <td class="p-3 font-medium text-gray-900 border-b border-gray-200">{row['Name']}</td>
+                        <td class="p-3 font-bold text-gray-900 border-b border-gray-200">{row['Marks']}</td>
+                        <td class="p-3 font-black text-blue-600 border-b border-gray-200">{row['Percentage Str']}</td>
+                        <td class="p-3 font-semibold text-gray-700 border-b border-gray-200">{status}</td>
                     </tr>
                     """
 
@@ -204,27 +220,27 @@ if uploaded_files:
                 </head>
                 <body class="bg-gray-50 font-sans text-gray-800 p-4 md:p-8">
                     <div class="max-w-6xl mx-auto">
-                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8 flex justify-between items-center hide-print">
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8 flex flex-col sm:flex-row justify-between items-center gap-4 hide-print">
                             <div>
-                                <h1 class="text-2xl font-bold text-gray-900">🎓 MKBU Final Merit List</h1>
-                                <p class="text-green-600 text-sm font-semibold mt-1"><i class="fas fa-check-circle"></i> Sorted by Highest Percentage</p>
+                                <h1 class="text-2xl font-bold text-gray-900">🎓 Final Merit List</h1>
+                                <p class="text-green-600 text-sm font-bold mt-1"><i class="fas fa-check-circle"></i> Sorted by Highest Percentage</p>
                             </div>
-                            <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium shadow-sm transition-colors duration-200 flex items-center gap-2">
-                                <i class="fas fa-file-pdf"></i> Print / Save as PDF
+                            <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold shadow-md transition-colors duration-200 flex items-center gap-2">
+                                <i class="fas fa-print"></i> Print / Save as PDF
                             </button>
                         </div>
-                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                             <table class="w-full text-left border-collapse">
                                 <thead>
-                                    <tr class="bg-gray-50 border-b border-gray-100 text-gray-600 text-sm uppercase tracking-wider">
-                                        <th class="p-4 font-semibold text-center">Rank</th>
-                                        <th class="p-4 font-semibold text-center">Status</th>
-                                        <th class="p-4 font-semibold">Dept</th>
-                                        <th class="p-4 font-semibold">Seat No</th>
-                                        <th class="p-4 font-semibold">Student Name</th>
-                                        <th class="p-4 font-semibold">Marks</th>
-                                        <th class="p-4 font-semibold">Percentage</th>
-                                        <th class="p-4 font-semibold">Result</th>
+                                    <tr class="bg-slate-100 border-b-2 border-gray-200 text-gray-700 text-sm uppercase tracking-wider">
+                                        <th class="p-4 font-bold text-center">Rank</th>
+                                        <th class="p-4 font-bold text-center">Status</th>
+                                        <th class="p-4 font-bold">Department</th>
+                                        <th class="p-4 font-bold">Seat No</th>
+                                        <th class="p-4 font-bold">Student Name</th>
+                                        <th class="p-4 font-bold">Marks</th>
+                                        <th class="p-4 font-bold">Percentage</th>
+                                        <th class="p-4 font-bold">Result</th>
                                     </tr>
                                 </thead>
                                 <tbody>
