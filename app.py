@@ -153,25 +153,48 @@ if uploaded_files:
                         # Find Marks
                         total_label = soup.find(lambda tag: tag.name in ['td', 'th'] and tag.text and "GRAND TOTAL" in tag.text.upper())
                         percentage_val = 0.0
-                        percentage_str = "0%"
-                        marks_string = "0 / 0"
+                        percentage_str = "N/A"
+                        marks_string = "N/A"
                         result_status = "Unknown"
                         
                         if total_label:
                             row = total_label.find_parent('tr')
                             cells = [c.text.strip() for c in row.find_all(['td', 'th']) if c.text.strip()]
-                            result_status = cells[-1] if len(cells) > 0 else "Unknown"
                             
-                            middle_text = " ".join(cells[1:-1])
-                            nums = re.findall(r'\d+', middle_text)
+                            # --- SMART STATUS & MARKS SEPARATION ---
+                            # Rule numbers (e.g. RESERVED U.ST.114) se confusion bachane ke liye:
+                            status_keywords = ["PASS", "FAIL", "ATKT", "ABSENT", "RESERVED", "WITHHELD", "U.F.M", "U.ST", "WH", "W.H."]
+                            
+                            found_status_idx = -1
+                            for i, cell in enumerate(cells):
+                                if any(kw in cell.upper() for kw in status_keywords):
+                                    found_status_idx = i
+                                    break
+                                    
+                            if found_status_idx != -1:
+                                result_status = " ".join(cells[found_status_idx:])
+                                marks_cells = cells[1:found_status_idx] # Status se pehle ke cells
+                            else:
+                                result_status = cells[-1] if len(cells) > 0 else "Unknown"
+                                marks_cells = cells[1:-1]
+                                
+                            # Ab sirf "marks_cells" mein se numbers nikalenge
+                            middle_text = " ".join(marks_cells)
+                            nums = [int(n) for n in re.findall(r'\b\d+\b', middle_text)]
                             
                             if len(nums) >= 2:
-                                obtained = int(nums[-2])
-                                maximum = int(nums[-1])
-                                if maximum > 0:
+                                obtained = nums[-2]
+                                maximum = nums[-1]
+                                
+                                # Logic Check: Total marks humesha obtained se zyada hone chahiye
+                                if maximum > 0 and obtained <= maximum:
                                     percentage_val = (obtained / maximum) * 100
                                     percentage_str = f"{round(percentage_val, 2)}%"
                                     marks_string = f"{obtained} / {maximum}"
+                                else:
+                                    marks_string = f"{obtained} / ?" # Fallback for unexpected format
+                            elif len(nums) == 1:
+                                marks_string = f"{nums[0]} / ?"
                         
                         results_data.append({
                             "Seat No": seat_no,
