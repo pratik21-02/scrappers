@@ -161,47 +161,41 @@ if uploaded_files:
                             row = total_label.find_parent('tr')
                             cells = [c.text.strip() for c in row.find_all(['td', 'th']) if c.text.strip()]
                             
-                            # --- SMART STATUS & MARKS SEPARATION ---
-                            # Rule numbers (e.g. RESERVED U.ST.114) se confusion bachane ke liye:
-                            status_keywords = ["PASS", "FAIL", "ATKT", "ABSENT", "RESERVED", "WITHHELD", "U.F.M", "U.ST", "WH", "W.H."]
+                            row_text_upper = " ".join(cells).upper()
                             
-                            found_status_idx = -1
-                            for i, cell in enumerate(cells):
-                                if any(kw in cell.upper() for kw in status_keywords):
-                                    found_status_idx = i
-                                    break
-                                    
-                            if found_status_idx != -1:
-                                result_status = " ".join(cells[found_status_idx:])
-                                marks_cells = cells[1:found_status_idx] # Status se pehle ke cells
-                            else:
-                                result_status = cells[-1] if len(cells) > 0 else "Unknown"
-                                marks_cells = cells[1:-1]
+                            # 1. Nikaalo asli Status (Words)
+                            status_parts = []
+                            for c in cells[1:]:
+                                if re.search(r'[A-Za-z]', c): # Check for alphabets (PASS, FAIL, U.ST, etc.)
+                                    status_parts.append(c)
+                            
+                            result_status = " ".join(status_parts) if status_parts else "Unknown"
                                 
-                            # Ab sirf "marks_cells" mein se numbers nikalenge
-                            middle_text = " ".join(marks_cells)
-                            nums = [int(n) for n in re.findall(r'\b\d+\b', middle_text)]
-                            
-                            # --- STRICT FIX FOR RESERVED/HELD RESULTS ---
-                            is_held = any(kw in result_status.upper() for kw in ["RESERVED", "U.ST", "WITHHELD", "U.F.M", "ABSENT", "WH"])
+                            # 2. Check karo agar result held hai (RESERVED, ABSENT)
+                            held_keywords = ["RESERVED", "U.ST", "U.F.M", "ABSENT", "WITHHELD", "WH", "W.H."]
+                            is_held = any(kw in row_text_upper for kw in held_keywords)
                             
                             if is_held:
                                 marks_string = "N/A"
                                 percentage_val = 0.0
                                 percentage_str = "N/A"
                             else:
+                                # 3. Agar normal PASS/FAIL hai, toh shuru ke do numbers nikaalo (Obtained, Total)
+                                nums = []
+                                for c in cells[1:]:
+                                    if not re.search(r'[A-Za-z]', c): # Jinme alphabets nahi hain, wahi marks hain
+                                        nums.extend([int(n) for n in re.findall(r'\b\d+\b', c)])
+                                
                                 if len(nums) >= 2:
-                                    obtained = nums[-2]
-                                    maximum = nums[-1]
+                                    obtained = nums[0]  # Pehla number
+                                    maximum = nums[1]   # Doosra number
                                     
-                                    # Logic Check: Total marks humesha obtained se zyada hone chahiye
                                     if maximum > 0 and obtained <= maximum:
                                         percentage_val = (obtained / maximum) * 100
                                         percentage_str = f"{round(percentage_val, 2)}%"
                                         marks_string = f"{obtained} / {maximum}"
                                     else:
-                                        # Agar error ho (obtained > maximum) toh percentage calculate nahi karenge
-                                        marks_string = f"{obtained} / ?" 
+                                        marks_string = f"{obtained} / {maximum} (?)"
                                 elif len(nums) == 1:
                                     marks_string = f"{nums[0]} / ?"
                         
