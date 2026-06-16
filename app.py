@@ -182,19 +182,28 @@ if uploaded_files:
                             middle_text = " ".join(marks_cells)
                             nums = [int(n) for n in re.findall(r'\b\d+\b', middle_text)]
                             
-                            if len(nums) >= 2:
-                                obtained = nums[-2]
-                                maximum = nums[-1]
-                                
-                                # Logic Check: Total marks humesha obtained se zyada hone chahiye
-                                if maximum > 0 and obtained <= maximum:
-                                    percentage_val = (obtained / maximum) * 100
-                                    percentage_str = f"{round(percentage_val, 2)}%"
-                                    marks_string = f"{obtained} / {maximum}"
-                                else:
-                                    marks_string = f"{obtained} / ?" # Fallback for unexpected format
-                            elif len(nums) == 1:
-                                marks_string = f"{nums[0]} / ?"
+                            # --- STRICT FIX FOR RESERVED/HELD RESULTS ---
+                            is_held = any(kw in result_status.upper() for kw in ["RESERVED", "U.ST", "WITHHELD", "U.F.M", "ABSENT", "WH"])
+                            
+                            if is_held:
+                                marks_string = "N/A"
+                                percentage_val = 0.0
+                                percentage_str = "N/A"
+                            else:
+                                if len(nums) >= 2:
+                                    obtained = nums[-2]
+                                    maximum = nums[-1]
+                                    
+                                    # Logic Check: Total marks humesha obtained se zyada hone chahiye
+                                    if maximum > 0 and obtained <= maximum:
+                                        percentage_val = (obtained / maximum) * 100
+                                        percentage_str = f"{round(percentage_val, 2)}%"
+                                        marks_string = f"{obtained} / {maximum}"
+                                    else:
+                                        # Agar error ho (obtained > maximum) toh percentage calculate nahi karenge
+                                        marks_string = f"{obtained} / ?" 
+                                elif len(nums) == 1:
+                                    marks_string = f"{nums[0]} / ?"
                         
                         results_data.append({
                             "Seat No": seat_no,
