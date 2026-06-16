@@ -148,29 +148,121 @@ if uploaded_files:
             progress_bar.progress(100)
             status_text.text("All results fetched successfully!")
             
-            # 3. DISPLAY FINAL MERIT LIST
+            # 3. DISPLAY FINAL MERIT LIST WITH CUSTOM UI
             if results_data:
                 st.markdown("---")
-                st.subheader("🏆 Final Merit List")
                 
                 # Convert to DataFrame and Sort
                 df = pd.DataFrame(results_data)
                 df = df.sort_values(by="Percentage", ascending=False).reset_index(drop=True)
-                df.index = df.index + 1 # Rank (1, 2, 3...)
+                df['Rank'] = df.index + 1 # Rank (1, 2, 3...)
                 
-                # Create a display friendly DataFrame
-                display_df = df[["Course", "Seat No", "Name", "Marks", "Percentage Str", "Status"]].copy()
-                display_df.columns = ["Department", "Seat Number", "Student Name", "Marks", "Percentage", "Result Status"]
+                # 3.1 HTML UI GENERATOR (Aapki pasand ka sundar design)
+                html_rows = ""
+                for idx, row in df.iterrows():
+                    dept_color = "bg-orange-100 text-orange-800" if row['Course'] == 'Zoology' else ("bg-purple-100 text-purple-800" if row['Course'] == 'Microbiology' else "bg-green-100 text-green-800")
+                    
+                    status = str(row['Status']).upper()
+                    if "PASS" in status: icon = "fas fa-check-circle text-green-500"
+                    elif "FAIL" in status or "ATKT" in status: icon = "fas fa-times-circle text-red-500"
+                    else: icon = "fas fa-exclamation-circle text-yellow-500"
+                        
+                    rank = row['Rank']
+                    if rank == 1: rank_display = '<span class="text-yellow-500 text-xl" title="Rank 1"><i class="fas fa-trophy"></i> 1</span>'
+                    elif rank == 2: rank_display = '<span class="text-gray-400 text-xl" title="Rank 2"><i class="fas fa-medal"></i> 2</span>'
+                    elif rank == 3: rank_display = '<span class="text-orange-400 text-xl" title="Rank 3"><i class="fas fa-medal"></i> 3</span>'
+                    else: rank_display = f'<span class="font-bold text-gray-600 text-lg">#{rank}</span>'
+
+                    html_rows += f"""
+                    <tr class="hover:bg-blue-50 transition-colors">
+                        <td class="p-4 text-center border-b border-gray-100">{rank_display}</td>
+                        <td class="p-4 w-10 text-center border-b border-gray-100"><i class="{icon}" title="{status}"></i></td>
+                        <td class="p-4 border-b border-gray-100"><span class="px-2 py-1 rounded-full text-xs font-semibold {dept_color}">{row['Course']}</span></td>
+                        <td class="p-4 font-mono text-sm text-gray-600 border-b border-gray-100">{row['Seat No']}</td>
+                        <td class="p-4 font-medium text-gray-900 border-b border-gray-100">{row['Name']}</td>
+                        <td class="p-4 font-bold text-gray-900 border-b border-gray-100">{row['Marks']}</td>
+                        <td class="p-4 font-semibold text-blue-600 border-b border-gray-100">{row['Percentage Str']}</td>
+                        <td class="p-4 font-medium text-gray-700 border-b border-gray-100">{status}</td>
+                    </tr>
+                    """
+
+                html_template = f"""<!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>MKBU Merit List</title>
+                    <script src="https://cdn.tailwindcss.com"></script>
+                    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+                    <style>
+                        @media print {{
+                            .hide-print {{ display: none !important; }}
+                            body {{ background: white; padding: 0; }}
+                            .shadow-sm {{ box-shadow: none !important; }}
+                            .border {{ border: none !important; }}
+                        }}
+                    </style>
+                </head>
+                <body class="bg-gray-50 font-sans text-gray-800 p-4 md:p-8">
+                    <div class="max-w-6xl mx-auto">
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8 flex justify-between items-center hide-print">
+                            <div>
+                                <h1 class="text-2xl font-bold text-gray-900">🎓 MKBU Final Merit List</h1>
+                                <p class="text-green-600 text-sm font-semibold mt-1"><i class="fas fa-check-circle"></i> Sorted by Highest Percentage</p>
+                            </div>
+                            <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium shadow-sm transition-colors duration-200 flex items-center gap-2">
+                                <i class="fas fa-file-pdf"></i> Print / Save as PDF
+                            </button>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 border-b border-gray-100 text-gray-600 text-sm uppercase tracking-wider">
+                                        <th class="p-4 font-semibold text-center">Rank</th>
+                                        <th class="p-4 font-semibold text-center">Status</th>
+                                        <th class="p-4 font-semibold">Dept</th>
+                                        <th class="p-4 font-semibold">Seat No</th>
+                                        <th class="p-4 font-semibold">Student Name</th>
+                                        <th class="p-4 font-semibold">Marks</th>
+                                        <th class="p-4 font-semibold">Percentage</th>
+                                        <th class="p-4 font-semibold">Result</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {html_rows}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </body>
+                </html>"""
+
+                # 3.2 Embed custom HTML directly inside Streamlit
+                import streamlit.components.v1 as components
+                st.subheader("🏆 Your Custom Dashboard")
+                components.html(html_template, height=600, scrolling=True)
                 
-                # Display table
-                st.dataframe(display_df, use_container_width=True, height=600)
+                # 3.3 Download Buttons for PDF & Excel
+                st.markdown("### 📥 Download Options")
+                col1, col2 = st.columns(2)
                 
-                # Download as CSV functionality
-                csv = display_df.to_csv(index_label="Rank").encode('utf-8')
-                st.download_button(
-                    label="📥 Download Merit List (Excel/CSV)",
-                    data=csv,
-                    file_name='MKBU_Merit_List.csv',
-                    mime='text/csv',
-                    type="primary"
-                )
+                with col1:
+                    st.download_button(
+                        label="📄 Download Dashboard (Click to Save PDF)",
+                        data=html_template,
+                        file_name='MKBU_Merit_Dashboard.html',
+                        mime='text/html',
+                        type="primary",
+                        use_container_width=True,
+                        help="Ise download karke open karein aur 'Save as PDF' dabayein. UI ekdum same rahega!"
+                    )
+                with col2:
+                    display_df = df[["Course", "Seat No", "Name", "Marks", "Percentage Str", "Status"]].copy()
+                    display_df.columns = ["Department", "Seat Number", "Student Name", "Marks", "Percentage", "Result Status"]
+                    csv = display_df.to_csv(index_label="Rank").encode('utf-8')
+                    st.download_button(
+                        label="📊 Download Excel Data (CSV)",
+                        data=csv,
+                        file_name='MKBU_Merit_List.csv',
+                        mime='text/csv',
+                        use_container_width=True
+                    )
