@@ -7,6 +7,7 @@ import time
 import PyPDF2
 import streamlit.components.v1 as components
 import urllib3
+import base64
 
 # Disable SSL Warnings for University Websites
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -29,7 +30,6 @@ st.markdown('<p class="main-header">🎓 MKBU Smart Merit App</p>', unsafe_allow
 st.markdown('<p class="sub-header">Upload Seat Number PDFs to Auto-Generate Sorted Merit Lists (For ALL Departments)</p>', unsafe_allow_html=True)
 
 # --- SESSION STATE (MEMORY) INIT ---
-# Ye app ko data yaad rakhne me madad karega taki download karne par data gayab na ho
 if 'fetch_done' not in st.session_state:
     st.session_state.fetch_done = False
     st.session_state.results_data = []
@@ -80,7 +80,7 @@ if uploaded_files:
                 sid_matches = list(re.finditer(r'(?<!\d)\d{10,14}(?!\d)', clean_text))
                 seat_matches = list(re.finditer(r'(?<!\d)\d{6,8}(?!\d)', clean_text))
                 
-                # SEQUENTIAL PAIRING LOGIC (100% Accurate)
+                # SEQUENTIAL PAIRING LOGIC
                 sids = [m.group() for m in sorted(sid_matches, key=lambda x: x.start())]
                 seats = [m.group() for m in sorted(seat_matches, key=lambda x: x.start())]
                 
@@ -135,14 +135,13 @@ if uploaded_files:
                     }
                     
                     response = None
-                    # Attempts increased to 3 and Timeout to 20s for slow MKBU servers
                     for attempt in range(3): 
                         try:
                             response = session.post(URL, data=payload, headers=headers, timeout=20, verify=False)
                             if response.status_code == 200:
                                 break
                         except requests.exceptions.RequestException:
-                            time.sleep(2) # Wait longer before retrying
+                            time.sleep(2)
                     
                     if response and response.status_code == 200:
                         soup = BeautifulSoup(response.text, 'html.parser')
@@ -203,7 +202,7 @@ if uploaded_files:
                 except Exception as e:
                     st.error(f"Error fetching {seat_no}: {str(e)}")
                 
-                time.sleep(1) # Increased delay slightly to be safer
+                time.sleep(1)
             
             progress_bar.progress(100)
             status_text.text("All results fetched successfully!")
@@ -221,6 +220,13 @@ if uploaded_files:
     if st.session_state.fetch_done and len(st.session_state.results_data) > 0:
         st.markdown("---")
         df = st.session_state.df
+        
+        # PREPARE CSV DATA FOR HTML INJECTION
+        display_df = df[["Rank", "Course", "Seat No", "Name", "Marks", "Percentage Str", "Status"]].copy()
+        display_df.columns = ["Rank", "Department", "Seat Number", "Student Name", "Marks", "Percentage", "Result Status"]
+        csv_string = display_df.to_csv(index=False)
+        # Encode CSV to Base64 to safely pass it to JavaScript
+        csv_b64 = base64.b64encode(csv_string.encode('utf-8')).decode('utf-8')
         
         # 3.1 HTML UI GENERATOR
         html_rows = ""
@@ -266,19 +272,21 @@ if uploaded_files:
                 @media print {{
                     .hide-print {{ display: none !important; }}
                 }}
+                /* Force table to fit in width during generation */
+                table {{ table-layout: auto; width: 100%; }}
             </style>
         </head>
         <body class="bg-gray-50 font-sans text-gray-800 p-4 md:p-8 relative">
 
             <!-- PDF CONTENT WRAPPER -->
-            <div id="pdf-content" class="max-w-6xl mx-auto relative bg-gray-50 p-4 sm:p-8 border border-gray-100 shadow-sm" style="min-height: 800px;">
+            <div id="pdf-content" class="max-w-6xl mx-auto relative bg-white p-4 sm:p-8 border border-gray-200 shadow-sm">
                 
-                <!-- WATERMARK LAYER (PREVIEW & PDF DONO MEIN DIKHEGA) -->
-                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9999; background-image: url('data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'600\\' height=\\'800\\'%3E%3Ctext x=\\'300\\' y=\\'400\\' transform=\\'rotate(-45, 300, 400)\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\' font-size=\\'65\\' font-family=\\'sans-serif\\' font-weight=\\'900\\' fill=\\'rgba(99, 102, 241, 0.12)\\'%3EATOM ACADEMY%3C/text%3E%3C/svg%3E'); background-repeat: repeat;"></div>
+                <!-- LANDSCAPE WATERMARK LAYER -->
+                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9999; background-image: url('data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'800\\' height=\\'600\\'%3E%3Ctext x=\\'400\\' y=\\'300\\' transform=\\'rotate(-30, 400, 300)\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\' font-size=\\'70\\' font-family=\\'sans-serif\\' font-weight=\\'900\\' fill=\\'rgba(99, 102, 241, 0.12)\\'%3EATOM ACADEMY%3C/text%3E%3C/svg%3E'); background-repeat: repeat;"></div>
                 
                 <!-- ACTUAL CONTENT -->
                 <div class="relative z-10">
-                    <div class="bg-white/95 backdrop-blur-sm rounded-xl shadow-sm border border-gray-200 p-6 mb-8 flex justify-between items-center gap-4">
+                    <div class="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 p-4 sm:p-6 mb-6 flex justify-between items-center gap-4">
                         <div>
                             <h1 class="text-2xl sm:text-3xl font-black text-indigo-950 uppercase tracking-tighter">🎓 Final Merit List</h1>
                             <p class="text-green-600 text-sm font-bold mt-1"><i class="fas fa-check-circle"></i> Sorted by Highest Percentage</p>
@@ -289,18 +297,18 @@ if uploaded_files:
                         </div>
                     </div>
                     
-                    <div class="bg-white/95 backdrop-blur-sm rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+                    <div class="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 overflow-hidden mb-8">
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr class="bg-slate-100/90 border-b-2 border-gray-200 text-gray-700 text-sm uppercase tracking-wider">
-                                    <th class="p-4 font-bold text-center">Rank</th>
-                                    <th class="p-4 font-bold text-center">Status</th>
-                                    <th class="p-4 font-bold">Department</th>
-                                    <th class="p-4 font-bold">Seat No</th>
-                                    <th class="p-4 font-bold">Student Name</th>
-                                    <th class="p-4 font-bold">Marks</th>
-                                    <th class="p-4 font-bold">Percentage</th>
-                                    <th class="p-4 font-bold">Result</th>
+                                    <th class="p-3 font-bold text-center">Rank</th>
+                                    <th class="p-3 font-bold text-center">Status</th>
+                                    <th class="p-3 font-bold">Department</th>
+                                    <th class="p-3 font-bold">Seat No</th>
+                                    <th class="p-3 font-bold">Student Name</th>
+                                    <th class="p-3 font-bold">Marks</th>
+                                    <th class="p-3 font-bold">Percentage</th>
+                                    <th class="p-3 font-bold">Result</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -310,24 +318,46 @@ if uploaded_files:
                     </div>
                     
                     <!-- FOOTER -->
-                    <div class="text-center text-[9px] sm:text-[11px] font-black text-gray-500 uppercase tracking-widest border-t-2 border-gray-300 pt-5 pb-2">
+                    <div class="text-center text-[9px] sm:text-[11px] font-black text-gray-500 uppercase tracking-widest border-t-2 border-gray-300 pt-5 pb-2 mt-4">
                         © ATOM ACADEMY | GENERATED VIA OFFICIAL PORTAL | DO NOT DISTRIBUTE WITHOUT PERMISSION
                     </div>
                 </div>
             </div>
 
-            <!-- PREMIUM DOWNLOAD PDF BUTTON (MOVED TO BOTTOM LEFT) -->
-            <div class="max-w-6xl mx-auto mt-6 flex justify-start hide-print">
-                <button onclick="generatePDF()" id="downloadBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black shadow-lg transition-all duration-200 flex items-center justify-center gap-3 text-sm uppercase tracking-widest border-2 border-indigo-800 active:scale-95">
+            <!-- PREMIUM BUTTONS: SIDE-BY-SIDE AT BOTTOM LEFT -->
+            <div class="max-w-6xl mx-auto mt-6 flex flex-row justify-start gap-4 hide-print">
+                <!-- PDF BUTTON -->
+                <button onclick="generatePDF()" id="downloadPdfBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black shadow-md transition-all duration-200 flex items-center justify-center gap-2 text-sm uppercase tracking-widest border-2 border-indigo-800 active:scale-95">
                     <i class="fas fa-file-pdf text-xl"></i> DOWNLOAD PDF
+                </button>
+                
+                <!-- CSV BUTTON -->
+                <button onclick="downloadCSV()" id="downloadCsvBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-black shadow-md transition-all duration-200 flex items-center justify-center gap-2 text-sm uppercase tracking-widest border-2 border-emerald-800 active:scale-95">
+                    <i class="fas fa-file-excel text-xl"></i> DOWNLOAD CSV
                 </button>
             </div>
 
             <script>
+                // --- CSV DOWNLOAD LOGIC (NO REFRESH) ---
+                const csvBase64 = "{csv_b64}";
+                
+                function downloadCSV() {{
+                    const csvStr = atob(csvBase64); // Decode Base64
+                    const blob = new Blob([csvStr], {{ type: 'text/csv;charset=utf-8;' }});
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', 'MKBU_Merit_List.csv');
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }}
+
+                // --- PDF DOWNLOAD LOGIC ---
                 function generatePDF() {{
-                    const btn = document.getElementById('downloadBtn');
+                    const btn = document.getElementById('downloadPdfBtn');
                     const origText = btn.innerHTML;
-                    btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i> PROCESSING PDF...';
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i> PROCESSING...';
                     btn.disabled = true;
                     btn.classList.add('opacity-75', 'cursor-not-allowed');
 
@@ -337,9 +367,11 @@ if uploaded_files:
                         margin:       [10, 5, 10, 5],
                         filename:     'MKBU_Merit_List.pdf',
                         image:        {{ type: 'jpeg', quality: 0.98 }},
-                        // windowWidth 1200 forces the canvas to render wide, fixing the cut-off issue perfectly
-                        html2canvas:  {{ scale: 2, useCORS: true, letterRendering: true, windowWidth: 1200 }},
-                        jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'portrait' }}
+                        // Removed windowWidth to prevent zoom-out/blank pages
+                        // scrollY: 0 prevents blank pages from scroll offsets
+                        html2canvas:  {{ scale: 2, useCORS: true, letterRendering: true, scrollY: 0 }},
+                        // Changed to LANDSCAPE so wide tables fit perfectly without cutting!
+                        jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'landscape' }}
                     }};
                     
                     html2pdf().set(opt).from(element).save().then(() => {{
@@ -361,21 +393,6 @@ if uploaded_files:
 
         # Embed custom HTML directly inside Streamlit
         st.subheader("🏆 Your Custom Dashboard")
-        # Increased height slightly to accommodate the button at the bottom
-        components.html(html_template, height=880, scrolling=True)
+        components.html(html_template, height=1000, scrolling=True)
         
-        # Download Button for Excel (Positioned right below the PDF button)
-        display_df = df[["Course", "Seat No", "Name", "Marks", "Percentage Str", "Status"]].copy()
-        display_df.columns = ["Department", "Seat Number", "Student Name", "Marks", "Percentage", "Result Status"]
-        csv = display_df.to_csv(index_label="Rank").encode('utf-8')
-        
-        st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
-        col1, col2, col3 = st.columns([2, 2, 6])
-        with col1:
-            st.download_button(
-                label="📥 Download Excel (CSV)",
-                data=csv,
-                file_name='MKBU_Merit_List.csv',
-                mime='text/csv',
-                use_container_width=True
-            )
+        # Removed the external Streamlit download button so the app NEVER refreshes!
