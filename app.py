@@ -262,18 +262,16 @@ if uploaded_files:
             <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
             <!-- HTML2PDF Library -->
             <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+            <style>
+                @media print {{
+                    .hide-print {{ display: none !important; }}
+                }}
+            </style>
         </head>
         <body class="bg-gray-50 font-sans text-gray-800 p-4 md:p-8 relative">
-            
-            <!-- PREMIUM DOWNLOAD PDF BUTTON -->
-            <div class="max-w-6xl mx-auto mb-6 flex justify-center">
-                <button onclick="generatePDF()" id="downloadBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black shadow-lg transition-all duration-200 flex items-center justify-center gap-3 text-lg uppercase tracking-widest w-full max-w-md border-2 border-indigo-800 active:scale-95">
-                    <i class="fas fa-file-pdf text-xl"></i> DOWNLOAD PDF
-                </button>
-            </div>
 
             <!-- PDF CONTENT WRAPPER -->
-            <div id="pdf-content" class="max-w-6xl mx-auto relative bg-gray-50 p-4 sm:p-8 border border-gray-100 shadow-sm" style="min-height: 1000px;">
+            <div id="pdf-content" class="max-w-6xl mx-auto relative bg-gray-50 p-4 sm:p-8 border border-gray-100 shadow-sm" style="min-height: 800px;">
                 
                 <!-- WATERMARK LAYER (PREVIEW & PDF DONO MEIN DIKHEGA) -->
                 <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9999; background-image: url('data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'600\\' height=\\'800\\'%3E%3Ctext x=\\'300\\' y=\\'400\\' transform=\\'rotate(-45, 300, 400)\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\' font-size=\\'65\\' font-family=\\'sans-serif\\' font-weight=\\'900\\' fill=\\'rgba(99, 102, 241, 0.12)\\'%3EATOM ACADEMY%3C/text%3E%3C/svg%3E'); background-repeat: repeat;"></div>
@@ -318,6 +316,13 @@ if uploaded_files:
                 </div>
             </div>
 
+            <!-- PREMIUM DOWNLOAD PDF BUTTON (MOVED TO BOTTOM LEFT) -->
+            <div class="max-w-6xl mx-auto mt-6 flex justify-start hide-print">
+                <button onclick="generatePDF()" id="downloadBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black shadow-lg transition-all duration-200 flex items-center justify-center gap-3 text-sm uppercase tracking-widest border-2 border-indigo-800 active:scale-95">
+                    <i class="fas fa-file-pdf text-xl"></i> DOWNLOAD PDF
+                </button>
+            </div>
+
             <script>
                 function generatePDF() {{
                     const btn = document.getElementById('downloadBtn');
@@ -332,7 +337,8 @@ if uploaded_files:
                         margin:       [10, 5, 10, 5],
                         filename:     'MKBU_Merit_List.pdf',
                         image:        {{ type: 'jpeg', quality: 0.98 }},
-                        html2canvas:  {{ scale: 2, useCORS: true, letterRendering: true }},
+                        // windowWidth 1200 forces the canvas to render wide, fixing the cut-off issue perfectly
+                        html2canvas:  {{ scale: 2, useCORS: true, letterRendering: true, windowWidth: 1200 }},
                         jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'portrait' }}
                     }};
                     
@@ -355,18 +361,21 @@ if uploaded_files:
 
         # Embed custom HTML directly inside Streamlit
         st.subheader("🏆 Your Custom Dashboard")
-        components.html(html_template, height=800, scrolling=True)
+        # Increased height slightly to accommodate the button at the bottom
+        components.html(html_template, height=880, scrolling=True)
         
-        # Download Button for Excel
+        # Download Button for Excel (Positioned right below the PDF button)
         display_df = df[["Course", "Seat No", "Name", "Marks", "Percentage Str", "Status"]].copy()
         display_df.columns = ["Department", "Seat Number", "Student Name", "Marks", "Percentage", "Result Status"]
         csv = display_df.to_csv(index_label="Rank").encode('utf-8')
         
-        st.markdown("### 📊 Additional Formats")
-        st.download_button(
-            label="📥 Download Excel Data (CSV)",
-            data=csv,
-            file_name='MKBU_Merit_List.csv',
-            mime='text/csv',
-            use_container_width=True
-        )
+        st.markdown("<div style='margin-top: -15px;'></div>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([2, 2, 6])
+        with col1:
+            st.download_button(
+                label="📥 Download Excel (CSV)",
+                data=csv,
+                file_name='MKBU_Merit_List.csv',
+                mime='text/csv',
+                use_container_width=True
+            )
