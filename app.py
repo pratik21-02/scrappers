@@ -5,6 +5,7 @@ import pandas as pd
 import re
 import time
 import PyPDF2
+import streamlit.components.v1 as components
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="MKBU Merit List Generator", page_icon="🎓", layout="wide")
@@ -23,13 +24,21 @@ st.markdown("""
 st.markdown('<p class="main-header">🎓 MKBU Smart Merit App</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Upload Seat Number PDFs to Auto-Generate Sorted Merit Lists (For ALL Departments)</p>', unsafe_allow_html=True)
 
+# --- SESSION STATE (MEMORY) INIT ---
+# Ye app ko data yaad rakhne me madad karega taki download karne par data gayab na ho
+if 'fetch_done' not in st.session_state:
+    st.session_state.fetch_done = False
+    st.session_state.results_data = []
+    st.session_state.df = pd.DataFrame()
+
 # --- APP LOGIC ---
 URL = "https://mkbhavuni.edu.in/bhavuni_result/result.php"
 
-# File Uploader - Removed specific department restriction
+# File Uploader
 uploaded_files = st.file_uploader("Upload PDF Files (Any Department / Course)", type="pdf", accept_multiple_files=True)
 
 if uploaded_files:
+    # 🚀 DATA FETCHING BLOCK
     if st.button("🚀 Fetch Results & Generate Merit List", type="primary", use_container_width=True):
         
         extracted_students = []
@@ -56,21 +65,18 @@ if uploaded_files:
                 elif "b.a" in f_low: course = "B.A"
                 elif "b.sc" in f_low: course = "B.Sc"
                 else:
-                    # Extracts first word of filename if department unknown
                     clean_name = re.sub(r'[^a-zA-Z\s]', '', file.name.replace('.pdf', ''))
                     words = clean_name.split()
                     if words:
                         course = words[0].capitalize()
 
                 # --- SUPER SMART EXTRACTION LOGIC ---
-                # Saare spaces aur next-lines ko theek karein
                 clean_text = re.sub(r'\s+', ' ', full_text)
                 
-                # SIDs (10-14 digits) aur Seat Nos (6-8 digits) dono ke saare locations nikal lo
                 sid_matches = list(re.finditer(r'(?<!\d)\d{10,14}(?!\d)', clean_text))
                 seat_matches = list(re.finditer(r'(?<!\d)\d{6,8}(?!\d)', clean_text))
                 
-                # SEQUENTIAL PAIRING LOGIC (100% Accurate for Tables)
+                # SEQUENTIAL PAIRING LOGIC (100% Accurate)
                 sids = [m.group() for m in sorted(sid_matches, key=lambda x: x.start())]
                 seats = [m.group() for m in sorted(seat_matches, key=lambda x: x.start())]
                 
@@ -78,7 +84,6 @@ if uploaded_files:
                 for i in range(min_len):
                     sid = sids[i]
                     seat = seats[i]
-                    # Prevent duplicates
                     if not any(s['sid'] == sid for s in extracted_students):
                         extracted_students.append({"seat": seat, "sid": sid, "course": course})
 
@@ -95,7 +100,7 @@ if uploaded_files:
             
             results_data = []
             
-            # --- CONNECTION STABILITY FIX ---
+            # CONNECTION STABILITY FIX
             session = requests.Session()
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -113,7 +118,6 @@ if uploaded_files:
                 sid = student['sid']
                 course = student['course']
                 
-                # Update progress
                 progress = int(((idx) / total_students) * 100)
                 progress_bar.progress(progress)
                 status_text.text(f"Fetching result for {course} Seat: {seat_no} ({idx+1}/{total_students})")
@@ -137,7 +141,6 @@ if uploaded_files:
                     if response and response.status_code == 200:
                         soup = BeautifulSoup(response.text, 'html.parser')
                         
-                        # Find Name
                         name_label = soup.find(string=re.compile(r"Student Name", re.IGNORECASE))
                         if name_label:
                             name_node = name_label.find_next('td')
@@ -145,7 +148,6 @@ if uploaded_files:
                         else:
                             name = "Name Not Found"
                             
-                        # Find Marks
                         total_label = soup.find(lambda tag: tag.name in ['td', 'th'] and tag.text and "GRAND TOTAL" in tag.text.upper())
                         percentage_val = 0.0
                         percentage_str = "0%"
@@ -199,161 +201,165 @@ if uploaded_files:
             progress_bar.progress(100)
             status_text.text("All results fetched successfully!")
             
-            # 3. DISPLAY FINAL MERIT LIST WITH CUSTOM UI
+            # Save to Session State (Memory)
             if results_data:
-                st.markdown("---")
-                
+                st.session_state.results_data = results_data
                 df = pd.DataFrame(results_data)
                 df = df.sort_values(by="Percentage", ascending=False).reset_index(drop=True)
                 df['Rank'] = df.index + 1 
+                st.session_state.df = df
+                st.session_state.fetch_done = True
+
+    # 🏆 DISPLAY FINAL MERIT LIST (Ye hamesha show hoga agar fetch_done True hai)
+    if st.session_state.fetch_done and len(st.session_state.results_data) > 0:
+        st.markdown("---")
+        df = st.session_state.df
+        
+        # 3.1 HTML UI GENERATOR
+        html_rows = ""
+        for idx, row in df.iterrows():
+            dept_colors = ["bg-blue-100 text-blue-800", "bg-purple-100 text-purple-800", "bg-pink-100 text-pink-800", "bg-green-100 text-green-800", "bg-orange-100 text-orange-800"]
+            color_idx = len(row['Course']) % len(dept_colors)
+            dept_color = dept_colors[color_idx]
+            
+            status = str(row['Status']).upper()
+            if "PASS" in status: icon = "fas fa-check-circle text-green-500"
+            elif "FAIL" in status or "ATKT" in status: icon = "fas fa-times-circle text-red-500"
+            else: icon = "fas fa-exclamation-circle text-yellow-500"
                 
-                # 3.1 HTML UI GENERATOR
-                html_rows = ""
-                for idx, row in df.iterrows():
-                    # Dynamic colors based on first letter of course (to look colorful for any dept)
-                    dept_colors = ["bg-blue-100 text-blue-800", "bg-purple-100 text-purple-800", "bg-pink-100 text-pink-800", "bg-green-100 text-green-800", "bg-orange-100 text-orange-800"]
-                    color_idx = len(row['Course']) % len(dept_colors)
-                    dept_color = dept_colors[color_idx]
-                    
-                    status = str(row['Status']).upper()
-                    if "PASS" in status: icon = "fas fa-check-circle text-green-500"
-                    elif "FAIL" in status or "ATKT" in status: icon = "fas fa-times-circle text-red-500"
-                    else: icon = "fas fa-exclamation-circle text-yellow-500"
-                        
-                    rank = row['Rank']
-                    if rank == 1: rank_display = '<span class="text-yellow-500 text-xl" title="Rank 1"><i class="fas fa-trophy"></i> 1</span>'
-                    elif rank == 2: rank_display = '<span class="text-gray-400 text-xl" title="Rank 2"><i class="fas fa-medal"></i> 2</span>'
-                    elif rank == 3: rank_display = '<span class="text-orange-400 text-xl" title="Rank 3"><i class="fas fa-medal"></i> 3</span>'
-                    else: rank_display = f'<span class="font-bold text-gray-600 text-lg">#{rank}</span>'
+            rank = row['Rank']
+            if rank == 1: rank_display = '<span class="text-yellow-500 text-xl" title="Rank 1"><i class="fas fa-trophy"></i> 1</span>'
+            elif rank == 2: rank_display = '<span class="text-gray-400 text-xl" title="Rank 2"><i class="fas fa-medal"></i> 2</span>'
+            elif rank == 3: rank_display = '<span class="text-orange-400 text-xl" title="Rank 3"><i class="fas fa-medal"></i> 3</span>'
+            else: rank_display = f'<span class="font-bold text-gray-600 text-lg">#{rank}</span>'
 
-                    html_rows += f"""
-                    <tr class="hover:bg-slate-50 transition-colors">
-                        <td class="p-3 text-center border-b border-gray-200">{rank_display}</td>
-                        <td class="p-3 w-10 text-center border-b border-gray-200"><i class="{icon}" title="{status}"></i></td>
-                        <td class="p-3 border-b border-gray-200"><span class="px-3 py-1 rounded-full text-xs font-bold {dept_color} shadow-sm">{row['Course']}</span></td>
-                        <td class="p-3 font-mono text-sm text-gray-600 border-b border-gray-200">{row['Seat No']}</td>
-                        <td class="p-3 font-medium text-gray-900 border-b border-gray-200">{row['Name']}</td>
-                        <td class="p-3 font-bold text-gray-900 border-b border-gray-200">{row['Marks']}</td>
-                        <td class="p-3 font-black text-blue-600 border-b border-gray-200">{row['Percentage Str']}</td>
-                        <td class="p-3 font-semibold text-gray-700 border-b border-gray-200">{status}</td>
-                    </tr>
-                    """
+            html_rows += f"""
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td class="p-3 text-center border-b border-gray-200">{rank_display}</td>
+                <td class="p-3 w-10 text-center border-b border-gray-200"><i class="{icon}" title="{status}"></i></td>
+                <td class="p-3 border-b border-gray-200"><span class="px-3 py-1 rounded-full text-xs font-bold {dept_color} shadow-sm">{row['Course']}</span></td>
+                <td class="p-3 font-mono text-sm text-gray-600 border-b border-gray-200">{row['Seat No']}</td>
+                <td class="p-3 font-medium text-gray-900 border-b border-gray-200">{row['Name']}</td>
+                <td class="p-3 font-bold text-gray-900 border-b border-gray-200">{row['Marks']}</td>
+                <td class="p-3 font-black text-blue-600 border-b border-gray-200">{row['Percentage Str']}</td>
+                <td class="p-3 font-semibold text-gray-700 border-b border-gray-200">{status}</td>
+            </tr>
+            """
 
-                html_template = f"""<!DOCTYPE html>
-                <html lang="en">
-                <head>
-                    <meta charset="UTF-8">
-                    <title>MKBU Merit List</title>
-                    <script src="https://cdn.tailwindcss.com"></script>
-                    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-                    <!-- HTML2PDF Library -->
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-                </head>
-                <body class="bg-gray-50 font-sans text-gray-800 p-4 md:p-8 relative">
-                    
-                    <!-- DOWNLOAD BUTTON -->
-                    <div class="max-w-6xl mx-auto mb-6 flex justify-center">
-                        <button onclick="generatePDF()" id="downloadBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black shadow-lg transition-all duration-200 flex items-center justify-center gap-3 text-lg uppercase tracking-widest w-full max-w-md border-2 border-indigo-800 active:scale-95">
-                            <i class="fas fa-file-pdf text-xl"></i> DOWNLOAD PDF
-                        </button>
-                    </div>
+        html_template = f"""<!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <title>MKBU Merit List</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+            <!-- HTML2PDF Library -->
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+        </head>
+        <body class="bg-gray-50 font-sans text-gray-800 p-4 md:p-8 relative">
+            
+            <!-- PREMIUM DOWNLOAD PDF BUTTON -->
+            <div class="max-w-6xl mx-auto mb-6 flex justify-center">
+                <button onclick="generatePDF()" id="downloadBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black shadow-lg transition-all duration-200 flex items-center justify-center gap-3 text-lg uppercase tracking-widest w-full max-w-md border-2 border-indigo-800 active:scale-95">
+                    <i class="fas fa-file-pdf text-xl"></i> DOWNLOAD PDF
+                </button>
+            </div>
 
-                    <!-- PDF CONTENT WRAPPER -->
-                    <div id="pdf-content" class="max-w-6xl mx-auto relative bg-gray-50 p-4 sm:p-8 border border-gray-100 shadow-sm" style="min-height: 1000px;">
-                        
-                        <!-- WATERMARK LAYER -->
-                        <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9999; background-image: url('data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'600\\' height=\\'800\\'%3E%3Ctext x=\\'300\\' y=\\'400\\' transform=\\'rotate(-45, 300, 400)\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\' font-size=\\'65\\' font-family=\\'sans-serif\\' font-weight=\\'900\\' fill=\\'rgba(99, 102, 241, 0.12)\\'%3EATOM ACADEMY%3C/text%3E%3C/svg%3E'); background-repeat: repeat;"></div>
-                        
-                        <!-- ACTUAL CONTENT -->
-                        <div class="relative z-10">
-                            <div class="bg-white/95 backdrop-blur-sm rounded-xl shadow-sm border border-gray-200 p-6 mb-8 flex justify-between items-center gap-4">
-                                <div>
-                                    <h1 class="text-2xl sm:text-3xl font-black text-indigo-950 uppercase tracking-tighter">🎓 Final Merit List</h1>
-                                    <p class="text-green-600 text-sm font-bold mt-1"><i class="fas fa-check-circle"></i> Sorted by Highest Percentage</p>
-                                </div>
-                                <div class="text-right hidden sm:block">
-                                    <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Generated By</div>
-                                    <div class="text-lg font-black text-indigo-800">ATOM ACADEMY</div>
-                                </div>
-                            </div>
-                            
-                            <div class="bg-white/95 backdrop-blur-sm rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
-                                <table class="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr class="bg-slate-100/90 border-b-2 border-gray-200 text-gray-700 text-sm uppercase tracking-wider">
-                                            <th class="p-4 font-bold text-center">Rank</th>
-                                            <th class="p-4 font-bold text-center">Status</th>
-                                            <th class="p-4 font-bold">Department</th>
-                                            <th class="p-4 font-bold">Seat No</th>
-                                            <th class="p-4 font-bold">Student Name</th>
-                                            <th class="p-4 font-bold">Marks</th>
-                                            <th class="p-4 font-bold">Percentage</th>
-                                            <th class="p-4 font-bold">Result</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {html_rows}
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            <!-- FOOTER -->
-                            <div class="text-center text-[9px] sm:text-[11px] font-black text-gray-500 uppercase tracking-widest border-t-2 border-gray-300 pt-5 pb-2">
-                                © ATOM ACADEMY | GENERATED VIA OFFICIAL PORTAL | DO NOT DISTRIBUTE WITHOUT PERMISSION
-                            </div>
+            <!-- PDF CONTENT WRAPPER -->
+            <div id="pdf-content" class="max-w-6xl mx-auto relative bg-gray-50 p-4 sm:p-8 border border-gray-100 shadow-sm" style="min-height: 1000px;">
+                
+                <!-- WATERMARK LAYER (PREVIEW & PDF DONO MEIN DIKHEGA) -->
+                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9999; background-image: url('data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'600\\' height=\\'800\\'%3E%3Ctext x=\\'300\\' y=\\'400\\' transform=\\'rotate(-45, 300, 400)\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\' font-size=\\'65\\' font-family=\\'sans-serif\\' font-weight=\\'900\\' fill=\\'rgba(99, 102, 241, 0.12)\\'%3EATOM ACADEMY%3C/text%3E%3C/svg%3E'); background-repeat: repeat;"></div>
+                
+                <!-- ACTUAL CONTENT -->
+                <div class="relative z-10">
+                    <div class="bg-white/95 backdrop-blur-sm rounded-xl shadow-sm border border-gray-200 p-6 mb-8 flex justify-between items-center gap-4">
+                        <div>
+                            <h1 class="text-2xl sm:text-3xl font-black text-indigo-950 uppercase tracking-tighter">🎓 Final Merit List</h1>
+                            <p class="text-green-600 text-sm font-bold mt-1"><i class="fas fa-check-circle"></i> Sorted by Highest Percentage</p>
+                        </div>
+                        <div class="text-right hidden sm:block">
+                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Generated By</div>
+                            <div class="text-lg font-black text-indigo-800">ATOM ACADEMY</div>
                         </div>
                     </div>
+                    
+                    <div class="bg-white/95 backdrop-blur-sm rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100/90 border-b-2 border-gray-200 text-gray-700 text-sm uppercase tracking-wider">
+                                    <th class="p-4 font-bold text-center">Rank</th>
+                                    <th class="p-4 font-bold text-center">Status</th>
+                                    <th class="p-4 font-bold">Department</th>
+                                    <th class="p-4 font-bold">Seat No</th>
+                                    <th class="p-4 font-bold">Student Name</th>
+                                    <th class="p-4 font-bold">Marks</th>
+                                    <th class="p-4 font-bold">Percentage</th>
+                                    <th class="p-4 font-bold">Result</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {html_rows}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- FOOTER -->
+                    <div class="text-center text-[9px] sm:text-[11px] font-black text-gray-500 uppercase tracking-widest border-t-2 border-gray-300 pt-5 pb-2">
+                        © ATOM ACADEMY | GENERATED VIA OFFICIAL PORTAL | DO NOT DISTRIBUTE WITHOUT PERMISSION
+                    </div>
+                </div>
+            </div>
 
-                    <script>
-                        function generatePDF() {{
-                            const btn = document.getElementById('downloadBtn');
-                            const origText = btn.innerHTML;
-                            btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i> PROCESSING PDF...';
-                            btn.disabled = true;
-                            btn.classList.add('opacity-75', 'cursor-not-allowed');
+            <script>
+                function generatePDF() {{
+                    const btn = document.getElementById('downloadBtn');
+                    const origText = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i> PROCESSING PDF...';
+                    btn.disabled = true;
+                    btn.classList.add('opacity-75', 'cursor-not-allowed');
 
-                            const element = document.getElementById('pdf-content');
-                            
-                            const opt = {{
-                                margin:       [10, 5, 10, 5],
-                                filename:     'MKBU_Merit_List.pdf',
-                                image:        {{ type: 'jpeg', quality: 0.98 }},
-                                html2canvas:  {{ scale: 2, useCORS: true, letterRendering: true }},
-                                jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'portrait' }}
-                            }};
-                            
-                            html2pdf().set(opt).from(element).save().then(() => {{
-                                btn.innerHTML = origText;
-                                btn.disabled = false;
-                                btn.classList.remove('opacity-75', 'cursor-not-allowed');
-                            }}).catch(err => {{
-                                btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ERROR';
-                                setTimeout(() => {{
-                                    btn.innerHTML = origText;
-                                    btn.disabled = false;
-                                    btn.classList.remove('opacity-75', 'cursor-not-allowed');
-                                }}, 3000);
-                            }});
-                        }}
-                    </script>
-                </body>
-                </html>"""
+                    const element = document.getElementById('pdf-content');
+                    
+                    const opt = {{
+                        margin:       [10, 5, 10, 5],
+                        filename:     'MKBU_Merit_List.pdf',
+                        image:        {{ type: 'jpeg', quality: 0.98 }},
+                        html2canvas:  {{ scale: 2, useCORS: true, letterRendering: true }},
+                        jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'portrait' }}
+                    }};
+                    
+                    html2pdf().set(opt).from(element).save().then(() => {{
+                        btn.innerHTML = origText;
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                    }}).catch(err => {{
+                        btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ERROR';
+                        setTimeout(() => {{
+                            btn.innerHTML = origText;
+                            btn.disabled = false;
+                            btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                        }}, 3000);
+                    }});
+                }}
+            </script>
+        </body>
+        </html>"""
 
-                # 3.2 Embed custom HTML directly inside Streamlit
-                import streamlit.components.v1 as components
-                st.subheader("🏆 Your Custom Dashboard")
-                components.html(html_template, height=800, scrolling=True)
-                
-                # 3.3 Download Buttons for Excel (HTML button is now removed!)
-                display_df = df[["Course", "Seat No", "Name", "Marks", "Percentage Str", "Status"]].copy()
-                display_df.columns = ["Department", "Seat Number", "Student Name", "Marks", "Percentage", "Result Status"]
-                csv = display_df.to_csv(index_label="Rank").encode('utf-8')
-                
-                st.markdown("### 📊 Additional Formats")
-                st.download_button(
-                    label="📥 Download Excel Data (CSV)",
-                    data=csv,
-                    file_name='MKBU_Merit_List.csv',
-                    mime='text/csv',
-                    use_container_width=True
-                )
+        # Embed custom HTML directly inside Streamlit
+        st.subheader("🏆 Your Custom Dashboard")
+        components.html(html_template, height=800, scrolling=True)
+        
+        # Download Button for Excel
+        display_df = df[["Course", "Seat No", "Name", "Marks", "Percentage Str", "Status"]].copy()
+        display_df.columns = ["Department", "Seat Number", "Student Name", "Marks", "Percentage", "Result Status"]
+        csv = display_df.to_csv(index_label="Rank").encode('utf-8')
+        
+        st.markdown("### 📊 Additional Formats")
+        st.download_button(
+            label="📥 Download Excel Data (CSV)",
+            data=csv,
+            file_name='MKBU_Merit_List.csv',
+            mime='text/csv',
+            use_container_width=True
+        )
