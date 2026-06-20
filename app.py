@@ -63,11 +63,6 @@ if uploaded_files:
                         course = words[0].capitalize()
 
                 # --- SUPER SMART EXTRACTION LOGIC (UPDATED) ---
-                # Distance wala logic lambe naamo par SIDs aur Seats ko aapas mein mix kar raha tha.
-                # Jiski wajah se Server 'Invalid Seat' bol kar Unknown de raha tha.
-                # Ab hum seedha Line-by-Line (chronological) pairing karenge!
-                
-                # Saare spaces aur next-lines ko theek karein
                 clean_text = re.sub(r'\s+', ' ', full_text)
                 
                 # SIDs (10-14 digits) aur Seat Nos (6-8 digits) dono ke saare locations nikal lo
@@ -100,7 +95,6 @@ if uploaded_files:
             results_data = []
             
             # --- CONNECTION STABILITY FIX ---
-            # Session use karne se website hume bot (hacker) nahi samjhegi aur connection cut nahi karegi
             session = requests.Session()
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -108,7 +102,6 @@ if uploaded_files:
                 'Referer': URL
             }
             
-            # Server ko block karne se rokne ke liye pehle ek blank GET request bhej kar Cookies initialize karein
             try:
                 session.get(URL, headers=headers, timeout=10)
             except:
@@ -131,15 +124,14 @@ if uploaded_files:
                         'search_seat_no': 'View Result'
                     }
                     
-                    # Request with AUTO-RETRY (Server load zyada ho tab bhi kaam karega)
                     response = None
-                    for attempt in range(2): # 2 baar try karega fail hone par
+                    for attempt in range(2): 
                         try:
                             response = session.post(URL, data=payload, headers=headers, timeout=15)
                             if response.status_code == 200:
                                 break
                         except requests.exceptions.RequestException:
-                            time.sleep(1.5) # Error aane par 1.5 seconds ruk kar retry
+                            time.sleep(1.5) 
                     
                     if response and response.status_code == 200:
                         soup = BeautifulSoup(response.text, 'html.parser')
@@ -164,7 +156,7 @@ if uploaded_files:
                             cells = [c.text.strip() for c in row.find_all(['td', 'th']) if c.text.strip()]
                             result_status = cells[-1] if len(cells) > 0 else "Unknown"
                             
-                            # RESERVED ya U.ST aane par marks ghalat calculate (421%) na ho iske liye Fix:
+                            # RESERVED Fix:
                             if any(err in result_status.upper() for err in ["RESERVED", "U.ST", "ABSENT", "U.F.M", "WITHHELD"]):
                                 percentage_val = -1.0
                                 percentage_str = "N/A"
@@ -178,7 +170,7 @@ if uploaded_files:
                                     maximum = int(nums[-1])
                                     if maximum > 0:
                                         percentage_val = (obtained / maximum) * 100
-                                        if percentage_val > 100:  # Ek aur safety check
+                                        if percentage_val > 100: 
                                             percentage_val = -1.0
                                             percentage_str = "N/A"
                                             marks_string = "N/A"
@@ -191,7 +183,7 @@ if uploaded_files:
                             "Course": course,
                             "Name": name,
                             "Marks": marks_string,
-                            "Percentage": percentage_val,  # Used for sorting
+                            "Percentage": percentage_val, 
                             "Percentage Str": percentage_str,
                             "Status": result_status
                         })
@@ -201,7 +193,7 @@ if uploaded_files:
                 except Exception as e:
                     st.error(f"Error fetching {seat_no}: {str(e)}")
                 
-                time.sleep(0.8) # Badhaya gaya delay taaki MKBU server block na kare
+                time.sleep(0.8)
             
             progress_bar.progress(100)
             status_text.text("All results fetched successfully!")
@@ -210,15 +202,13 @@ if uploaded_files:
             if results_data:
                 st.markdown("---")
                 
-                # Convert to DataFrame and Sort
                 df = pd.DataFrame(results_data)
                 df = df.sort_values(by="Percentage", ascending=False).reset_index(drop=True)
-                df['Rank'] = df.index + 1 # Rank (1, 2, 3...)
+                df['Rank'] = df.index + 1 
                 
                 # 3.1 HTML UI GENERATOR
                 html_rows = ""
                 for idx, row in df.iterrows():
-                    # Dynamic colors based on first letter of course (to look colorful for any dept)
                     dept_colors = ["bg-blue-100 text-blue-800", "bg-purple-100 text-purple-800", "bg-pink-100 text-pink-800", "bg-green-100 text-green-800", "bg-orange-100 text-orange-800"]
                     color_idx = len(row['Course']) % len(dept_colors)
                     dept_color = dept_colors[color_idx]
@@ -255,6 +245,18 @@ if uploaded_files:
                     <script src="https://cdn.tailwindcss.com"></script>
                     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
                     <style>
+                        /* ATOM ACADEMY WATERMARK CSS */
+                        body::after {{
+                            content: "";
+                            position: fixed;
+                            top: 0; left: 0; right: 0; bottom: 0;
+                            pointer-events: none;
+                            z-index: 50;
+                            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='1122'%3E%3Ctext x='400' y='561' transform='rotate(-45, 400, 561)' text-anchor='middle' dominant-baseline='middle' font-size='90' font-family='sans-serif' font-weight='bold' fill='rgba(165, 180, 252, 0.15)'%3EATOM ACADEMY%3C/text%3E%3C/svg%3E");
+                            background-repeat: repeat;
+                            background-size: 210mm 297mm;
+                            background-position: top left;
+                        }}
                         @media print {{
                             .hide-print {{ display: none !important; }}
                             body {{ background: white; padding: 0; }}
@@ -263,9 +265,9 @@ if uploaded_files:
                         }}
                     </style>
                 </head>
-                <body class="bg-gray-50 font-sans text-gray-800 p-4 md:p-8">
-                    <div class="max-w-6xl mx-auto">
-                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8 flex flex-col sm:flex-row justify-between items-center gap-4 hide-print">
+                <body class="bg-gray-50 font-sans text-gray-800 p-4 md:p-8 relative">
+                    <div class="max-w-6xl mx-auto relative z-10">
+                        <div class="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-gray-200 p-6 mb-8 flex flex-col sm:flex-row justify-between items-center gap-4 hide-print">
                             <div>
                                 <h1 class="text-2xl font-bold text-gray-900">🎓 Final Merit List</h1>
                                 <p class="text-green-600 text-sm font-bold mt-1"><i class="fas fa-check-circle"></i> Sorted by Highest Percentage</p>
@@ -274,10 +276,10 @@ if uploaded_files:
                                 <i class="fas fa-print"></i> Print / Save as PDF
                             </button>
                         </div>
-                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                            <table class="w-full text-left border-collapse">
+                        <div class="bg-white/90 backdrop-blur-sm rounded-xl shadow-sm border border-gray-200 overflow-hidden relative z-10">
+                            <table class="w-full text-left border-collapse relative z-10">
                                 <thead>
-                                    <tr class="bg-slate-100 border-b-2 border-gray-200 text-gray-700 text-sm uppercase tracking-wider">
+                                    <tr class="bg-slate-100/90 border-b-2 border-gray-200 text-gray-700 text-sm uppercase tracking-wider">
                                         <th class="p-4 font-bold text-center">Rank</th>
                                         <th class="p-4 font-bold text-center">Status</th>
                                         <th class="p-4 font-bold">Department</th>
