@@ -241,21 +241,22 @@ if uploaded_files:
             else: icon = "fas fa-exclamation-circle text-yellow-500"
                 
             rank = row['Rank']
-            if rank == 1: rank_display = '<span class="text-yellow-500 text-xl" title="Rank 1"><i class="fas fa-trophy"></i> 1</span>'
-            elif rank == 2: rank_display = '<span class="text-gray-400 text-xl" title="Rank 2"><i class="fas fa-medal"></i> 2</span>'
-            elif rank == 3: rank_display = '<span class="text-orange-400 text-xl" title="Rank 3"><i class="fas fa-medal"></i> 3</span>'
-            else: rank_display = f'<span class="font-bold text-gray-600 text-lg">#{rank}</span>'
+            if rank == 1: rank_display = '<span class="text-yellow-500 text-lg" title="Rank 1"><i class="fas fa-trophy"></i> 1</span>'
+            elif rank == 2: rank_display = '<span class="text-gray-400 text-lg" title="Rank 2"><i class="fas fa-medal"></i> 2</span>'
+            elif rank == 3: rank_display = '<span class="text-orange-400 text-lg" title="Rank 3"><i class="fas fa-medal"></i> 3</span>'
+            else: rank_display = f'<span class="font-bold text-gray-600 text-md">#{rank}</span>'
 
+            # PADDING AND SIZES COMPACTED FOR PORTRAIT
             html_rows += f"""
             <tr class="hover:bg-slate-50 transition-colors">
-                <td class="p-3 text-center border-b border-gray-200">{rank_display}</td>
-                <td class="p-3 w-10 text-center border-b border-gray-200"><i class="{icon}" title="{status}"></i></td>
-                <td class="p-3 border-b border-gray-200"><span class="px-3 py-1 rounded-full text-xs font-bold {dept_color} shadow-sm">{row['Course']}</span></td>
-                <td class="p-3 font-mono text-sm text-gray-600 border-b border-gray-200">{row['Seat No']}</td>
-                <td class="p-3 font-medium text-gray-900 border-b border-gray-200">{row['Name']}</td>
-                <td class="p-3 font-bold text-gray-900 border-b border-gray-200">{row['Marks']}</td>
-                <td class="p-3 font-black text-blue-600 border-b border-gray-200">{row['Percentage Str']}</td>
-                <td class="p-3 font-semibold text-gray-700 border-b border-gray-200">{status}</td>
+                <td class="p-2 text-center border-b border-gray-200">{rank_display}</td>
+                <td class="p-2 w-8 text-center border-b border-gray-200"><i class="{icon}" title="{status}"></i></td>
+                <td class="p-2 border-b border-gray-200"><span class="px-2 py-1 rounded-full text-[10px] font-bold {dept_color} shadow-sm">{row['Course']}</span></td>
+                <td class="p-2 font-mono text-xs text-gray-600 border-b border-gray-200">{row['Seat No']}</td>
+                <td class="p-2 font-medium text-xs text-gray-900 border-b border-gray-200">{row['Name']}</td>
+                <td class="p-2 font-bold text-xs text-gray-900 border-b border-gray-200">{row['Marks']}</td>
+                <td class="p-2 font-black text-blue-600 text-sm border-b border-gray-200">{row['Percentage Str']}</td>
+                <td class="p-2 font-semibold text-xs text-gray-700 border-b border-gray-200">{status}</td>
             </tr>
             """
 
@@ -285,36 +286,36 @@ if uploaded_files:
         <body class="bg-gray-50 font-sans text-gray-800 p-4 md:p-8 relative">
 
             <!-- PDF CONTENT WRAPPER -->
-            <div id="pdf-content" class="max-w-6xl mx-auto relative bg-white p-4 sm:p-8 border border-gray-200 shadow-sm">
+            <div id="pdf-content" class="max-w-4xl mx-auto relative bg-white p-4 sm:p-6 border border-gray-200 shadow-sm">
                 
-                <!-- LANDSCAPE WATERMARK LAYER -->
-                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9999; background-image: url('data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'800\\' height=\\'600\\'%3E%3Ctext x=\\'400\\' y=\\'300\\' transform=\\'rotate(-30, 400, 300)\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\' font-size=\\'70\\' font-family=\\'sans-serif\\' font-weight=\\'900\\' fill=\\'rgba(99, 102, 241, 0.12)\\'%3EATOM ACADEMY%3C/text%3E%3C/svg%3E'); background-repeat: repeat;"></div>
+                <!-- PORTRAIT WATERMARK LAYER -->
+                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9999; background-image: url('data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'800\\' height=\\'1000\\'%3E%3Ctext x=\\'400\\' y=\\'500\\' transform=\\'rotate(-45, 400, 500)\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\' font-size=\\'80\\' font-family=\\'sans-serif\\' font-weight=\\'900\\' fill=\\'rgba(99, 102, 241, 0.12)\\'%3EATOM ACADEMY%3C/text%3E%3C/svg%3E'); background-repeat: repeat;"></div>
                 
                 <!-- ACTUAL CONTENT -->
                 <div class="relative z-10">
-                    <div class="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 p-4 sm:p-6 mb-6 flex justify-between items-center gap-4">
+                    <div class="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 p-4 mb-6 flex justify-between items-center gap-4">
                         <div>
-                            <h1 class="text-2xl sm:text-3xl font-black text-indigo-950 uppercase tracking-tighter">🎓 Final Merit List</h1>
-                            <p class="text-green-600 text-sm font-bold mt-1"><i class="fas fa-check-circle"></i> Sorted by Highest Percentage</p>
+                            <h1 class="text-xl sm:text-2xl font-black text-indigo-950 uppercase tracking-tighter">🎓 Final Merit List</h1>
+                            <p class="text-green-600 text-xs font-bold mt-1"><i class="fas fa-check-circle"></i> Sorted by Highest Percentage</p>
                         </div>
                         <div class="text-right hidden sm:block">
-                            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Generated By</div>
-                            <div class="text-lg font-black text-indigo-800">ATOM ACADEMY</div>
+                            <div class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Generated By</div>
+                            <div class="text-sm font-black text-indigo-800">ATOM ACADEMY</div>
                         </div>
                     </div>
                     
                     <div class="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 overflow-hidden mb-8">
                         <table class="w-full text-left border-collapse">
                             <thead>
-                                <tr class="bg-slate-100/90 border-b-2 border-gray-200 text-gray-700 text-sm uppercase tracking-wider">
-                                    <th class="p-3 font-bold text-center">Rank</th>
-                                    <th class="p-3 font-bold text-center">Status</th>
-                                    <th class="p-3 font-bold">Department</th>
-                                    <th class="p-3 font-bold">Seat No</th>
-                                    <th class="p-3 font-bold">Student Name</th>
-                                    <th class="p-3 font-bold">Marks</th>
-                                    <th class="p-3 font-bold">Percentage</th>
-                                    <th class="p-3 font-bold">Result</th>
+                                <tr class="bg-slate-100/90 border-b-2 border-gray-200 text-gray-700 text-xs uppercase tracking-wider">
+                                    <th class="p-2 font-bold text-center">Rank</th>
+                                    <th class="p-2 font-bold text-center">Status</th>
+                                    <th class="p-2 font-bold">Dept</th>
+                                    <th class="p-2 font-bold">Seat No</th>
+                                    <th class="p-2 font-bold">Student Name</th>
+                                    <th class="p-2 font-bold">Marks</th>
+                                    <th class="p-2 font-bold">Percentage</th>
+                                    <th class="p-2 font-bold">Result</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -324,14 +325,14 @@ if uploaded_files:
                     </div>
                     
                     <!-- FOOTER -->
-                    <div class="text-center text-[9px] sm:text-[11px] font-black text-gray-500 uppercase tracking-widest border-t-2 border-gray-300 pt-5 pb-2 mt-4">
+                    <div class="text-center text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-widest border-t-2 border-gray-300 pt-4 pb-2 mt-4">
                         © ATOM ACADEMY | GENERATED VIA OFFICIAL PORTAL | DO NOT DISTRIBUTE WITHOUT PERMISSION
                     </div>
                 </div>
             </div>
 
             <!-- PREMIUM BUTTONS: SIDE-BY-SIDE AT BOTTOM LEFT -->
-            <div class="max-w-6xl mx-auto mt-6 flex flex-row justify-start gap-4 hide-print">
+            <div class="max-w-4xl mx-auto mt-6 flex flex-row justify-start gap-4 hide-print">
                 <!-- PDF BUTTON -->
                 <button onclick="generatePDF()" id="downloadPdfBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black shadow-md transition-all duration-200 flex items-center justify-center gap-2 text-sm uppercase tracking-widest border-2 border-indigo-800 active:scale-95">
                     <i class="fas fa-file-pdf text-xl"></i> DOWNLOAD PDF
@@ -373,9 +374,10 @@ if uploaded_files:
                         margin:       [10, 5, 10, 5],
                         filename:     'MKBU_Merit_List.pdf',
                         image:        {{ type: 'jpeg', quality: 0.98 }},
-                        html2canvas:  {{ scale: 2, useCORS: true, letterRendering: true, scrollY: 0 }},
-                        jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'landscape' }},
-                        // THE SECOND MAGIC FIX (Telling converter to never slice 'tr' elements)
+                        // windowWidth: 1000 ensures it captures the full wide table and then scales it perfectly into portrait A4
+                        html2canvas:  {{ scale: 2, useCORS: true, letterRendering: true, scrollY: 0, windowWidth: 1000 }},
+                        // REVERTED TO PORTRAIT AS REQUESTED
+                        jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'portrait' }},
                         pagebreak:    {{ mode: ['css', 'legacy'], avoid: 'tr' }} 
                     }};
                     
