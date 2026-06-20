@@ -62,34 +62,43 @@ if uploaded_files:
                     if words:
                         course = words[0].capitalize()
 
-                # --- SUPER SMART EXTRACTION LOGIC ---
-                # Pehle wala logic fail ho raha tha kiyunki PDF mein random numbers (like date, subject code) 
-                # aane se Seat aur SID ki pair galat ho rahi thi. Ab hum 100% accurate proximity search use karenge!
+                # --- SUPER SMART EXTRACTION LOGIC (UPDATED) ---
+                # PyPDF2 kabhi-kabhi text aage-peeche extract kar leta hai (SID pehle, Seat baad me).
+                # Isliye ab hum forwards aur backwards dono taraf sabse kareeb (closest) number dhundhenge!
                 
                 # Saare spaces aur next-lines ko theek karein
                 clean_text = re.sub(r'\s+', ' ', full_text)
                 
-                # 1. Sabse pehle SID dhundhe (10-14 digits) kiyunki ye sabse unique hota hai
-                sid_matches = list(re.finditer(r'\b\d{10,14}\b', clean_text))
+                # SIDs (10-14 digits) aur Seat Nos (6-8 digits) dono ke saare locations nikal lo
+                sid_matches = list(re.finditer(r'(?<!\d)\d{10,14}(?!\d)', clean_text))
+                seat_matches = list(re.finditer(r'(?<!\d)\d{6,8}(?!\d)', clean_text))
+                
+                assigned_seats = set()
                 
                 for sid_match in sid_matches:
                     sid = sid_match.group()
-                    start_pos = sid_match.start()
+                    sid_pos = sid_match.start()
                     
-                    # 2. SID ke theek peeche (150 letters ke andar) hum Seat Number dhundhenge
-                    # Is area mein Student ka naam aur gender hota hai, aur uske pehle exact Seat No!
-                    search_area = clean_text[max(0, start_pos - 150):start_pos]
+                    closest_seat = None
+                    min_dist = 1500  # Max 1500 characters ki doori tak dhundhega
                     
-                    # 3. 6 se 8 digit wala number dhoondhein
-                    seat_matches = re.findall(r'\b\d{6,8}\b', search_area)
-                    
-                    if seat_matches:
-                        # Jo number SID ke sabse kareeb (last) mila, wahi Seat No hai
-                        seat_no = seat_matches[-1] 
+                    for seat_match in seat_matches:
+                        seat = seat_match.group()
+                        if seat in assigned_seats:
+                            continue
+                            
+                        seat_pos = seat_match.start()
+                        dist = abs(sid_pos - seat_pos) # Absolute distance (aage ya peeche dono check karega)
                         
+                        if dist < min_dist:
+                            min_dist = dist
+                            closest_seat = seat
+                            
+                    if closest_seat:
+                        assigned_seats.add(closest_seat)
                         # Prevent duplicates
-                        if not any(s['seat'] == seat_no for s in extracted_students):
-                            extracted_students.append({"seat": seat_no, "sid": sid, "course": course})
+                        if not any(s['sid'] == sid for s in extracted_students):
+                            extracted_students.append({"seat": closest_seat, "sid": sid, "course": course})
 
         total_students = len(extracted_students)
         
