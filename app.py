@@ -63,8 +63,9 @@ if uploaded_files:
                         course = words[0].capitalize()
 
                 # --- SUPER SMART EXTRACTION LOGIC (UPDATED) ---
-                # PyPDF2 kabhi-kabhi text aage-peeche extract kar leta hai (SID pehle, Seat baad me).
-                # Isliye ab hum forwards aur backwards dono taraf sabse kareeb (closest) number dhundhenge!
+                # Distance wala logic lambe naamo par SIDs aur Seats ko aapas mein mix kar raha tha.
+                # Jiski wajah se Server 'Invalid Seat' bol kar Unknown de raha tha.
+                # Ab hum seedha Line-by-Line (chronological) pairing karenge!
                 
                 # Saare spaces aur next-lines ko theek karein
                 clean_text = re.sub(r'\s+', ' ', full_text)
@@ -73,32 +74,17 @@ if uploaded_files:
                 sid_matches = list(re.finditer(r'(?<!\d)\d{10,14}(?!\d)', clean_text))
                 seat_matches = list(re.finditer(r'(?<!\d)\d{6,8}(?!\d)', clean_text))
                 
-                assigned_seats = set()
+                # SEQUENTIAL PAIRING LOGIC (100% Accurate for Tables)
+                sids = [m.group() for m in sorted(sid_matches, key=lambda x: x.start())]
+                seats = [m.group() for m in sorted(seat_matches, key=lambda x: x.start())]
                 
-                for sid_match in sid_matches:
-                    sid = sid_match.group()
-                    sid_pos = sid_match.start()
-                    
-                    closest_seat = None
-                    min_dist = 1500  # Max 1500 characters ki doori tak dhundhega
-                    
-                    for seat_match in seat_matches:
-                        seat = seat_match.group()
-                        if seat in assigned_seats:
-                            continue
-                            
-                        seat_pos = seat_match.start()
-                        dist = abs(sid_pos - seat_pos) # Absolute distance (aage ya peeche dono check karega)
-                        
-                        if dist < min_dist:
-                            min_dist = dist
-                            closest_seat = seat
-                            
-                    if closest_seat:
-                        assigned_seats.add(closest_seat)
-                        # Prevent duplicates
-                        if not any(s['sid'] == sid for s in extracted_students):
-                            extracted_students.append({"seat": closest_seat, "sid": sid, "course": course})
+                min_len = min(len(sids), len(seats))
+                for i in range(min_len):
+                    sid = sids[i]
+                    seat = seats[i]
+                    # Prevent duplicates
+                    if not any(s['sid'] == sid for s in extracted_students):
+                        extracted_students.append({"seat": seat, "sid": sid, "course": course})
 
         total_students = len(extracted_students)
         
@@ -118,8 +104,15 @@ if uploaded_files:
             session = requests.Session()
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Content-Type': 'application/x-www-form-urlencoded'
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': URL
             }
+            
+            # Server ko block karne se rokne ke liye pehle ek blank GET request bhej kar Cookies initialize karein
+            try:
+                session.get(URL, headers=headers, timeout=10)
+            except:
+                pass
             
             for idx, student in enumerate(extracted_students):
                 seat_no = student['seat']
@@ -171,16 +164,27 @@ if uploaded_files:
                             cells = [c.text.strip() for c in row.find_all(['td', 'th']) if c.text.strip()]
                             result_status = cells[-1] if len(cells) > 0 else "Unknown"
                             
-                            middle_text = " ".join(cells[1:-1])
-                            nums = re.findall(r'\d+', middle_text)
-                            
-                            if len(nums) >= 2:
-                                obtained = int(nums[-2])
-                                maximum = int(nums[-1])
-                                if maximum > 0:
-                                    percentage_val = (obtained / maximum) * 100
-                                    percentage_str = f"{round(percentage_val, 2)}%"
-                                    marks_string = f"{obtained} / {maximum}"
+                            # RESERVED ya U.ST aane par marks ghalat calculate (421%) na ho iske liye Fix:
+                            if any(err in result_status.upper() for err in ["RESERVED", "U.ST", "ABSENT", "U.F.M", "WITHHELD"]):
+                                percentage_val = -1.0
+                                percentage_str = "N/A"
+                                marks_string = "N/A"
+                            else:
+                                middle_text = " ".join(cells[1:-1])
+                                nums = re.findall(r'\d+', middle_text)
+                                
+                                if len(nums) >= 2:
+                                    obtained = int(nums[-2])
+                                    maximum = int(nums[-1])
+                                    if maximum > 0:
+                                        percentage_val = (obtained / maximum) * 100
+                                        if percentage_val > 100:  # Ek aur safety check
+                                            percentage_val = -1.0
+                                            percentage_str = "N/A"
+                                            marks_string = "N/A"
+                                        else:
+                                            percentage_str = f"{round(percentage_val, 2)}%"
+                                            marks_string = f"{obtained} / {maximum}"
                         
                         results_data.append({
                             "Seat No": seat_no,
