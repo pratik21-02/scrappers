@@ -6,6 +6,10 @@ import re
 import time
 import PyPDF2
 import streamlit.components.v1 as components
+import urllib3
+
+# Disable SSL Warnings for University Websites
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="MKBU Merit List Generator", page_icon="🎓", layout="wide")
@@ -109,7 +113,8 @@ if uploaded_files:
             }
             
             try:
-                session.get(URL, headers=headers, timeout=10)
+                # SSL Verify False for University websites to prevent blockage
+                session.get(URL, headers=headers, timeout=15, verify=False)
             except:
                 pass
             
@@ -130,13 +135,14 @@ if uploaded_files:
                     }
                     
                     response = None
-                    for attempt in range(2): 
+                    # Attempts increased to 3 and Timeout to 20s for slow MKBU servers
+                    for attempt in range(3): 
                         try:
-                            response = session.post(URL, data=payload, headers=headers, timeout=15)
+                            response = session.post(URL, data=payload, headers=headers, timeout=20, verify=False)
                             if response.status_code == 200:
                                 break
                         except requests.exceptions.RequestException:
-                            time.sleep(1.5) 
+                            time.sleep(2) # Wait longer before retrying
                     
                     if response and response.status_code == 200:
                         soup = BeautifulSoup(response.text, 'html.parser')
@@ -191,12 +197,13 @@ if uploaded_files:
                             "Status": result_status
                         })
                     else:
-                        st.warning(f"Failed to load {seat_no}")
+                        err_reason = f"HTTP {response.status_code}" if response else "Timeout/Blocked"
+                        st.warning(f"Failed to load {seat_no} - {err_reason}")
                         
                 except Exception as e:
                     st.error(f"Error fetching {seat_no}: {str(e)}")
                 
-                time.sleep(0.8)
+                time.sleep(1) # Increased delay slightly to be safer
             
             progress_bar.progress(100)
             status_text.text("All results fetched successfully!")
