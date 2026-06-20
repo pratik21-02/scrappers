@@ -274,6 +274,12 @@ if uploaded_files:
                 }}
                 /* Force table to fit in width during generation */
                 table {{ table-layout: auto; width: 100%; }}
+                
+                /* THE MAGIC FIX FOR PAGE BREAK CUTS */
+                tr, td, th {{ 
+                    page-break-inside: avoid !important; 
+                    break-inside: avoid !important; 
+                }}
             </style>
         </head>
         <body class="bg-gray-50 font-sans text-gray-800 p-4 md:p-8 relative">
@@ -367,11 +373,10 @@ if uploaded_files:
                         margin:       [10, 5, 10, 5],
                         filename:     'MKBU_Merit_List.pdf',
                         image:        {{ type: 'jpeg', quality: 0.98 }},
-                        // Removed windowWidth to prevent zoom-out/blank pages
-                        // scrollY: 0 prevents blank pages from scroll offsets
                         html2canvas:  {{ scale: 2, useCORS: true, letterRendering: true, scrollY: 0 }},
-                        // Changed to LANDSCAPE so wide tables fit perfectly without cutting!
-                        jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'landscape' }}
+                        jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'landscape' }},
+                        // THE SECOND MAGIC FIX (Telling converter to never slice 'tr' elements)
+                        pagebreak:    {{ mode: ['css', 'legacy'], avoid: 'tr' }} 
                     }};
                     
                     html2pdf().set(opt).from(element).save().then(() => {{
