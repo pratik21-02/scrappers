@@ -246,17 +246,17 @@ if uploaded_files:
             elif rank == 3: rank_display = '<span class="text-orange-400 text-lg" title="Rank 3"><i class="fas fa-medal"></i> 3</span>'
             else: rank_display = f'<span class="font-bold text-gray-600 text-md">#{rank}</span>'
 
-            # PADDING AND SIZES COMPACTED FOR PORTRAIT
+            # PADDING COMPACTED & WHITESPACE NOWRAP ADDED TO PREVENT SQUISHING ON MOBILE
             html_rows += f"""
             <tr class="hover:bg-slate-50 transition-colors">
-                <td class="p-2 text-center border-b border-gray-200">{rank_display}</td>
-                <td class="p-2 w-8 text-center border-b border-gray-200"><i class="{icon}" title="{status}"></i></td>
-                <td class="p-2 border-b border-gray-200"><span class="px-2 py-1 rounded-full text-[10px] font-bold {dept_color} shadow-sm">{row['Course']}</span></td>
-                <td class="p-2 font-mono text-xs text-gray-600 border-b border-gray-200">{row['Seat No']}</td>
-                <td class="p-2 font-medium text-xs text-gray-900 border-b border-gray-200">{row['Name']}</td>
-                <td class="p-2 font-bold text-xs text-gray-900 border-b border-gray-200">{row['Marks']}</td>
-                <td class="p-2 font-black text-blue-600 text-sm border-b border-gray-200">{row['Percentage Str']}</td>
-                <td class="p-2 font-semibold text-xs text-gray-700 border-b border-gray-200">{status}</td>
+                <td class="py-2 px-1 text-center border-b border-gray-200 whitespace-nowrap">{rank_display}</td>
+                <td class="py-2 px-1 w-8 text-center border-b border-gray-200"><i class="{icon}" title="{status}"></i></td>
+                <td class="py-2 px-2 border-b border-gray-200 whitespace-nowrap"><span class="px-2 py-1 rounded-full text-[10px] font-bold {dept_color} shadow-sm">{row['Course']}</span></td>
+                <td class="py-2 px-2 font-mono text-xs text-gray-600 border-b border-gray-200 whitespace-nowrap">{row['Seat No']}</td>
+                <td class="py-2 px-2 font-medium text-xs text-gray-900 border-b border-gray-200 min-w-[150px]">{row['Name']}</td>
+                <td class="py-2 px-2 font-bold text-xs text-gray-900 border-b border-gray-200 whitespace-nowrap">{row['Marks']}</td>
+                <td class="py-2 px-2 font-black text-blue-600 text-sm border-b border-gray-200 whitespace-nowrap">{row['Percentage Str']}</td>
+                <td class="py-2 px-2 font-semibold text-xs text-gray-700 border-b border-gray-200 whitespace-nowrap">{status}</td>
             </tr>
             """
 
@@ -264,6 +264,7 @@ if uploaded_files:
         <html lang="en">
         <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>MKBU Merit List</title>
             <script src="https://cdn.tailwindcss.com"></script>
             <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -281,12 +282,18 @@ if uploaded_files:
                     page-break-inside: avoid !important; 
                     break-inside: avoid !important; 
                 }}
+                
+                /* Custom Scrollbar for Mobile */
+                ::-webkit-scrollbar {{ height: 6px; }}
+                ::-webkit-scrollbar-track {{ background: #f1f1f1; border-radius: 4px; }}
+                ::-webkit-scrollbar-thumb {{ background: #c7d2fe; border-radius: 4px; }}
+                ::-webkit-scrollbar-thumb:hover {{ background: #818cf8; }}
             </style>
         </head>
-        <body class="bg-gray-50 font-sans text-gray-800 p-4 md:p-8 relative">
+        <body class="bg-gray-50 font-sans text-gray-800 p-2 sm:p-4 md:p-8 relative">
 
             <!-- PDF CONTENT WRAPPER -->
-            <div id="pdf-content" class="max-w-4xl mx-auto relative bg-white p-4 sm:p-6 border border-gray-200 shadow-sm">
+            <div id="pdf-content" class="max-w-4xl mx-auto relative bg-white p-4 sm:p-6 border border-gray-200 shadow-sm w-full transition-all duration-300">
                 
                 <!-- PORTRAIT WATERMARK LAYER -->
                 <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9999; background-image: url('data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'800\\' height=\\'1000\\'%3E%3Ctext x=\\'400\\' y=\\'500\\' transform=\\'rotate(-45, 400, 500)\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\' font-size=\\'80\\' font-family=\\'sans-serif\\' font-weight=\\'900\\' fill=\\'rgba(99, 102, 241, 0.12)\\'%3EATOM ACADEMY%3C/text%3E%3C/svg%3E'); background-repeat: repeat;"></div>
@@ -304,24 +311,27 @@ if uploaded_files:
                         </div>
                     </div>
                     
-                    <div class="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 overflow-hidden mb-8">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="bg-slate-100/90 border-b-2 border-gray-200 text-gray-700 text-xs uppercase tracking-wider">
-                                    <th class="p-2 font-bold text-center">Rank</th>
-                                    <th class="p-2 font-bold text-center">Status</th>
-                                    <th class="p-2 font-bold">Dept</th>
-                                    <th class="p-2 font-bold">Seat No</th>
-                                    <th class="p-2 font-bold">Student Name</th>
-                                    <th class="p-2 font-bold">Marks</th>
-                                    <th class="p-2 font-bold">Percentage</th>
-                                    <th class="p-2 font-bold">Result</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {html_rows}
-                            </tbody>
-                        </table>
+                    <!-- WRAPPED IN OVERFLOW-X-AUTO TO FIX MOBILE PREVIEW SQUISH ISSUE -->
+                    <div class="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 overflow-hidden mb-8 w-full">
+                        <div class="overflow-x-auto w-full pb-2">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-100/90 border-b-2 border-gray-200 text-gray-700 text-xs uppercase tracking-wider">
+                                        <th class="p-2 font-bold text-center whitespace-nowrap">Rank</th>
+                                        <th class="p-2 font-bold text-center whitespace-nowrap">Status</th>
+                                        <th class="p-2 font-bold whitespace-nowrap">Dept</th>
+                                        <th class="p-2 font-bold whitespace-nowrap">Seat No</th>
+                                        <th class="p-2 font-bold min-w-[150px]">Student Name</th>
+                                        <th class="p-2 font-bold whitespace-nowrap">Marks</th>
+                                        <th class="p-2 font-bold whitespace-nowrap">Percentage</th>
+                                        <th class="p-2 font-bold whitespace-nowrap">Result</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {html_rows}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                     
                     <!-- FOOTER -->
@@ -332,14 +342,14 @@ if uploaded_files:
             </div>
 
             <!-- PREMIUM BUTTONS: SIDE-BY-SIDE AT BOTTOM LEFT -->
-            <div class="max-w-4xl mx-auto mt-6 flex flex-row justify-start gap-4 hide-print">
+            <div class="max-w-4xl mx-auto mt-6 flex flex-row flex-wrap justify-start gap-4 hide-print w-full">
                 <!-- PDF BUTTON -->
-                <button onclick="generatePDF()" id="downloadPdfBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black shadow-md transition-all duration-200 flex items-center justify-center gap-2 text-sm uppercase tracking-widest border-2 border-indigo-800 active:scale-95">
+                <button onclick="generatePDF()" id="downloadPdfBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black shadow-md transition-all duration-200 flex items-center justify-center gap-2 text-sm uppercase tracking-widest border-2 border-indigo-800 active:scale-95 flex-1 sm:flex-none min-w-[200px]">
                     <i class="fas fa-file-pdf text-xl"></i> DOWNLOAD PDF
                 </button>
                 
                 <!-- CSV BUTTON -->
-                <button onclick="downloadCSV()" id="downloadCsvBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-black shadow-md transition-all duration-200 flex items-center justify-center gap-2 text-sm uppercase tracking-widest border-2 border-emerald-800 active:scale-95">
+                <button onclick="downloadCSV()" id="downloadCsvBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-black shadow-md transition-all duration-200 flex items-center justify-center gap-2 text-sm uppercase tracking-widest border-2 border-emerald-800 active:scale-95 flex-1 sm:flex-none min-w-[200px]">
                     <i class="fas fa-file-excel text-xl"></i> DOWNLOAD CSV
                 </button>
             </div>
@@ -370,22 +380,35 @@ if uploaded_files:
 
                     const element = document.getElementById('pdf-content');
                     
+                    // SMART HACK: Temporary force specific desktop width before saving to prevent cut-offs!
+                    const originalWidth = element.style.width;
+                    const originalMaxWidth = element.style.maxWidth;
+                    // Force desktop width (900px fits perfectly into A4 Portrait ratio)
+                    element.style.width = '900px'; 
+                    element.style.maxWidth = '900px';
+                    
                     const opt = {{
                         margin:       [10, 5, 10, 5],
                         filename:     'MKBU_Merit_List.pdf',
                         image:        {{ type: 'jpeg', quality: 0.98 }},
-                        // windowWidth: 1000 ensures it captures the full wide table and then scales it perfectly into portrait A4
-                        html2canvas:  {{ scale: 2, useCORS: true, letterRendering: true, scrollY: 0, windowWidth: 1000 }},
-                        // REVERTED TO PORTRAIT AS REQUESTED
+                        html2canvas:  {{ scale: 2, useCORS: true, letterRendering: true, scrollY: 0 }},
                         jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'portrait' }},
                         pagebreak:    {{ mode: ['css', 'legacy'], avoid: 'tr' }} 
                     }};
                     
                     html2pdf().set(opt).from(element).save().then(() => {{
+                        // Restore mobile width instantly after save
+                        element.style.width = originalWidth;
+                        element.style.maxWidth = originalMaxWidth;
+                        
                         btn.innerHTML = origText;
                         btn.disabled = false;
                         btn.classList.remove('opacity-75', 'cursor-not-allowed');
                     }}).catch(err => {{
+                        // Restore even on error
+                        element.style.width = originalWidth;
+                        element.style.maxWidth = originalMaxWidth;
+                        
                         btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ERROR';
                         setTimeout(() => {{
                             btn.innerHTML = origText;
@@ -401,5 +424,3 @@ if uploaded_files:
         # Embed custom HTML directly inside Streamlit
         st.subheader("🏆 Your Custom Dashboard")
         components.html(html_template, height=1000, scrolling=True)
-        
-        # Removed the external Streamlit download button so the app NEVER refreshes!
