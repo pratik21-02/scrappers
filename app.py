@@ -312,8 +312,8 @@ if uploaded_files:
                     </div>
                     
                     <!-- WRAPPED IN OVERFLOW-X-AUTO TO FIX MOBILE PREVIEW SQUISH ISSUE -->
-                    <div class="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 overflow-hidden mb-8 w-full">
-                        <div class="overflow-x-auto w-full pb-2">
+                    <div id="table-parent" class="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 overflow-hidden mb-8 w-full">
+                        <div id="table-scroll-container" class="overflow-x-auto w-full pb-2">
                             <table class="w-full text-left border-collapse">
                                 <thead>
                                     <tr class="bg-slate-100/90 border-b-2 border-gray-200 text-gray-700 text-xs uppercase tracking-wider">
@@ -379,36 +379,57 @@ if uploaded_files:
                     btn.classList.add('opacity-75', 'cursor-not-allowed');
 
                     const element = document.getElementById('pdf-content');
+                    const scrollContainer = document.getElementById('table-scroll-container');
+                    const tableParent = document.getElementById('table-parent');
                     
-                    // SMART HACK: Temporary force specific desktop width before saving to prevent cut-offs!
-                    const originalWidth = element.style.width;
-                    const originalMaxWidth = element.style.maxWidth;
-                    // Force desktop width (900px fits perfectly into A4 Portrait ratio)
-                    element.style.width = '900px'; 
-                    element.style.maxWidth = '900px';
+                    // SMART HACK: Temporary remove overflow to prevent PDF cutoff on PC and mobile
+                    if (scrollContainer) {{
+                        scrollContainer.classList.remove('overflow-x-auto');
+                        scrollContainer.classList.add('overflow-visible');
+                    }}
+                    if (tableParent) {{
+                        tableParent.classList.remove('overflow-hidden');
+                    }}
                     
                     const opt = {{
                         margin:       [10, 5, 10, 5],
                         filename:     'MKBU_Merit_List.pdf',
-                        image:        {{ type: 'jpeg', quality: 0.98 }},
-                        html2canvas:  {{ scale: 2, useCORS: true, letterRendering: true, scrollY: 0 }},
+                        image:        {{ type: 'jpeg', quality: 0.95 }}, // Optimized for mobile memory
+                        html2canvas:  {{ 
+                            scale: 2, 
+                            useCORS: true, 
+                            letterRendering: true, 
+                            scrollY: 0, 
+                            windowWidth: 1024 // Forces desktop rendering width to avoid clipping
+                        }},
                         jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'portrait' }},
                         pagebreak:    {{ mode: ['css', 'legacy'], avoid: 'tr' }} 
                     }};
                     
                     html2pdf().set(opt).from(element).save().then(() => {{
-                        // Restore mobile width instantly after save
-                        element.style.width = originalWidth;
-                        element.style.maxWidth = originalMaxWidth;
+                        // Restore overflow instantly after save
+                        if (scrollContainer) {{
+                            scrollContainer.classList.add('overflow-x-auto');
+                            scrollContainer.classList.remove('overflow-visible');
+                        }}
+                        if (tableParent) {{
+                            tableParent.classList.add('overflow-hidden');
+                        }}
                         
                         btn.innerHTML = origText;
                         btn.disabled = false;
                         btn.classList.remove('opacity-75', 'cursor-not-allowed');
                     }}).catch(err => {{
                         // Restore even on error
-                        element.style.width = originalWidth;
-                        element.style.maxWidth = originalMaxWidth;
+                        if (scrollContainer) {{
+                            scrollContainer.classList.add('overflow-x-auto');
+                            scrollContainer.classList.remove('overflow-visible');
+                        }}
+                        if (tableParent) {{
+                            tableParent.classList.add('overflow-hidden');
+                        }}
                         
+                        console.error(err);
                         btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ERROR';
                         setTimeout(() => {{
                             btn.innerHTML = origText;
