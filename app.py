@@ -8,6 +8,7 @@ import PyPDF2
 import streamlit.components.v1 as components
 import urllib3
 import base64
+import json
 
 # Disable SSL Warnings for University Websites
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -227,6 +228,20 @@ if uploaded_files:
         csv_string = display_df.to_csv(index=False)
         csv_b64 = base64.b64encode(csv_string.encode('utf-8')).decode('utf-8')
         
+        # PREPARE CLEAN JSON DATA FOR VECTOR PDF ENGINE (100% Mobile & PC Compatible)
+        pdf_rows_data = []
+        for idx, row in df.iterrows():
+            pdf_rows_data.append({
+                "rank": int(row['Rank']),
+                "status": str(row['Status']).upper(),
+                "dept": str(row['Course']),
+                "seat": str(row['Seat No']),
+                "name": str(row['Name']),
+                "marks": str(row['Marks']),
+                "perc": str(row['Percentage Str'])
+            })
+        pdf_rows_json = json.dumps(pdf_rows_data)
+        
         # 3.1 HTML UI GENERATOR
         html_rows = ""
         for idx, row in df.iterrows():
@@ -240,22 +255,22 @@ if uploaded_files:
             else: icon = "fas fa-exclamation-circle text-yellow-500"
                 
             rank = row['Rank']
-            if rank == 1: rank_display = '<span class="text-yellow-500 text-lg" title="Rank 1"><i class="fas fa-trophy"></i> 1</span>'
-            elif rank == 2: rank_display = '<span class="text-gray-400 text-lg" title="Rank 2"><i class="fas fa-medal"></i> 2</span>'
-            elif rank == 3: rank_display = '<span class="text-orange-400 text-lg" title="Rank 3"><i class="fas fa-medal"></i> 3</span>'
-            else: rank_display = f'<span class="font-bold text-gray-600 text-md">#{rank}</span>'
+            if rank == 1: rank_display = '<span class="text-yellow-500 text-xs sm:text-lg font-bold" title="Rank 1"><i class="fas fa-trophy"></i> 1</span>'
+            elif rank == 2: rank_display = '<span class="text-gray-400 text-xs sm:text-lg font-bold" title="Rank 2"><i class="fas fa-medal"></i> 2</span>'
+            elif rank == 3: rank_display = '<span class="text-orange-400 text-xs sm:text-lg font-bold" title="Rank 3"><i class="fas fa-medal"></i> 3</span>'
+            else: rank_display = f'<span class="font-bold text-gray-600 text-[10px] sm:text-sm">#{rank}</span>'
 
-            # PADDING COMPACTED & WHITESPACE NOWRAP ADDED TO PREVENT SQUISHING ON MOBILE
+            # RESPONSIVE PADDING & FONTS SO MOBILE PREVIEW FITS ALL COLUMNS CLEANLY
             html_rows += f"""
             <tr class="hover:bg-slate-50 transition-colors">
-                <td class="py-2 px-1 text-center border-b border-gray-200 whitespace-nowrap">{rank_display}</td>
-                <td class="py-2 px-1 w-8 text-center border-b border-gray-200"><i class="{icon}" title="{status}"></i></td>
-                <td class="py-2 px-2 border-b border-gray-200 whitespace-nowrap"><span class="px-2 py-1 rounded-full text-[10px] font-bold {dept_color} shadow-sm">{row['Course']}</span></td>
-                <td class="py-2 px-2 font-mono text-xs text-gray-600 border-b border-gray-200 whitespace-nowrap">{row['Seat No']}</td>
-                <td class="py-2 px-2 font-medium text-xs text-gray-900 border-b border-gray-200 min-w-[150px]">{row['Name']}</td>
-                <td class="py-2 px-2 font-bold text-xs text-gray-900 border-b border-gray-200 whitespace-nowrap">{row['Marks']}</td>
-                <td class="py-2 px-2 font-black text-blue-600 text-sm border-b border-gray-200 whitespace-nowrap">{row['Percentage Str']}</td>
-                <td class="py-2 px-2 font-semibold text-xs text-gray-700 border-b border-gray-200 whitespace-nowrap">{status}</td>
+                <td class="py-1.5 px-1 sm:p-2.5 text-center border-b border-gray-200 whitespace-nowrap">{rank_display}</td>
+                <td class="py-1.5 px-1 sm:p-2.5 text-center border-b border-gray-200"><i class="{icon} text-[10px] sm:text-sm" title="{status}"></i></td>
+                <td class="py-1.5 px-1 sm:p-2.5 border-b border-gray-200 whitespace-nowrap"><span class="px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full text-[8px] sm:text-[10px] font-bold {dept_color} shadow-sm">{row['Course']}</span></td>
+                <td class="py-1.5 px-1 sm:p-2.5 font-mono text-[9px] sm:text-xs text-gray-600 border-b border-gray-200 whitespace-nowrap">{row['Seat No']}</td>
+                <td class="py-1.5 px-1 sm:p-2.5 font-medium text-[9px] sm:text-xs text-gray-900 border-b border-gray-200 leading-tight">{row['Name']}</td>
+                <td class="py-1.5 px-1 sm:p-2.5 font-bold text-[9px] sm:text-xs text-gray-900 border-b border-gray-200 whitespace-nowrap">{row['Marks']}</td>
+                <td class="py-1.5 px-1 sm:p-2.5 font-black text-blue-600 text-[9px] sm:text-sm border-b border-gray-200 whitespace-nowrap">{row['Percentage Str']}</td>
+                <td class="py-1.5 px-1 sm:p-2.5 font-semibold text-[8px] sm:text-xs text-gray-700 border-b border-gray-200 whitespace-nowrap">{status}</td>
             </tr>
             """
 
@@ -267,61 +282,50 @@ if uploaded_files:
             <title>MKBU Merit List</title>
             <script src="https://cdn.tailwindcss.com"></script>
             <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-            <!-- HTML2PDF Library -->
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+            <!-- Pure Vector PDF Libraries (jsPDF + AutoTable) - Zero Cut-off & 100% Mobile Working -->
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
             <style>
-                @media print {{
-                    .hide-print {{ display: none !important; }}
-                }}
                 table {{ table-layout: auto; width: 100%; }}
-                
-                /* THE MAGIC FIX FOR PAGE BREAK CUTS */
-                tr, td, th {{ 
-                    page-break-inside: avoid !important; 
-                    break-inside: avoid !important; 
-                }}
-                
-                /* Custom Scrollbar for Mobile */
-                ::-webkit-scrollbar {{ height: 6px; }}
+                ::-webkit-scrollbar {{ height: 5px; width: 5px; }}
                 ::-webkit-scrollbar-track {{ background: #f1f1f1; border-radius: 4px; }}
                 ::-webkit-scrollbar-thumb {{ background: #c7d2fe; border-radius: 4px; }}
-                ::-webkit-scrollbar-thumb:hover {{ background: #818cf8; }}
             </style>
         </head>
-        <body class="bg-gray-50 font-sans text-gray-800 p-2 sm:p-4 md:p-8 relative">
+        <body class="bg-gray-50 font-sans text-gray-800 p-1 sm:p-4 md:p-6 relative">
 
-            <!-- PDF CONTENT WRAPPER -->
-            <div id="pdf-content" class="max-w-4xl mx-auto relative bg-white p-4 sm:p-6 border border-gray-200 shadow-sm w-full transition-all duration-300">
+            <!-- DASHBOARD PREVIEW WRAPPER -->
+            <div id="pdf-content" class="max-w-5xl mx-auto relative bg-white p-2 sm:p-6 border border-gray-200 rounded-xl shadow-sm w-full overflow-hidden">
                 
-                <!-- PORTRAIT WATERMARK LAYER -->
-                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 9999; background-image: url('data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'800\\' height=\\'1000\\'%3E%3Ctext x=\\'400\\' y=\\'500\\' transform=\\'rotate(-45, 400, 500)\\' text-anchor=\\'middle\\' dominant-baseline=\\'middle\\' font-size=\\'80\\' font-family=\\'sans-serif\\' font-weight=\\'900\\' fill=\\'rgba(99, 102, 241, 0.12)\\'%3EATOM ACADEMY%3C/text%3E%3C/svg%3E'); background-repeat: repeat;"></div>
+                <!-- PREVIEW WATERMARK LAYER -->
+                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 50; background-image: url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Ctext x='200' y='200' transform='rotate(-45, 200, 200)' text-anchor='middle' dominant-baseline='middle' font-size='36' font-family='sans-serif' font-weight='900' fill='rgba(99, 102, 241, 0.10)'%3EATOM ACADEMY%3C/text%3E%3C/svg%3E&quot;); background-repeat: repeat;"></div>
                 
                 <!-- ACTUAL CONTENT -->
                 <div class="relative z-10">
-                    <div class="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 p-4 mb-6 flex justify-between items-center gap-4">
+                    <div class="bg-white/95 rounded-xl border border-gray-100 p-3 sm:p-4 mb-4 flex justify-between items-center gap-2">
                         <div>
-                            <h1 class="text-xl sm:text-2xl font-black text-indigo-950 uppercase tracking-tighter">🎓 Final Merit List</h1>
-                            <p class="text-green-600 text-xs font-bold mt-1"><i class="fas fa-check-circle"></i> Sorted by Highest Percentage</p>
+                            <h1 class="text-base sm:text-2xl font-black text-indigo-950 uppercase tracking-tighter">🎓 Final Merit List</h1>
+                            <p class="text-green-600 text-[10px] sm:text-xs font-bold mt-0.5"><i class="fas fa-check-circle"></i> Sorted by Highest Percentage</p>
                         </div>
-                        <div class="text-right hidden sm:block">
-                            <div class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Generated By</div>
-                            <div class="text-sm font-black text-indigo-800">ATOM ACADEMY</div>
+                        <div class="text-right">
+                            <div class="text-[7px] sm:text-[9px] font-bold text-gray-400 uppercase tracking-widest">Generated By</div>
+                            <div class="text-xs sm:text-sm font-black text-indigo-800">ATOM ACADEMY</div>
                         </div>
                     </div>
                     
-                    <div id="table-parent" class="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 overflow-hidden mb-8 w-full">
-                        <div id="table-scroll-container" class="overflow-x-auto w-full pb-2">
+                    <div class="bg-white/95 rounded-xl border border-gray-100 overflow-hidden mb-4 w-full">
+                        <div class="overflow-x-auto w-full">
                             <table class="w-full text-left border-collapse">
                                 <thead>
-                                    <tr class="bg-slate-100/90 border-b-2 border-gray-200 text-gray-700 text-xs uppercase tracking-wider">
-                                        <th class="p-2 font-bold text-center whitespace-nowrap">Rank</th>
-                                        <th class="p-2 font-bold text-center whitespace-nowrap">Status</th>
-                                        <th class="p-2 font-bold whitespace-nowrap">Dept</th>
-                                        <th class="p-2 font-bold whitespace-nowrap">Seat No</th>
-                                        <th class="p-2 font-bold min-w-[150px]">Student Name</th>
-                                        <th class="p-2 font-bold whitespace-nowrap">Marks</th>
-                                        <th class="p-2 font-bold whitespace-nowrap">Percentage</th>
-                                        <th class="p-2 font-bold whitespace-nowrap">Result</th>
+                                    <tr class="bg-slate-100 border-b-2 border-gray-200 text-gray-700 text-[8px] sm:text-xs uppercase tracking-wider">
+                                        <th class="py-2 px-1 sm:p-2.5 font-bold text-center whitespace-nowrap">Rank</th>
+                                        <th class="py-2 px-1 sm:p-2.5 font-bold text-center whitespace-nowrap">Status</th>
+                                        <th class="py-2 px-1 sm:p-2.5 font-bold whitespace-nowrap">Dept</th>
+                                        <th class="py-2 px-1 sm:p-2.5 font-bold whitespace-nowrap">Seat No</th>
+                                        <th class="py-2 px-1 sm:p-2.5 font-bold">Student Name</th>
+                                        <th class="py-2 px-1 sm:p-2.5 font-bold whitespace-nowrap">Marks</th>
+                                        <th class="py-2 px-1 sm:p-2.5 font-bold whitespace-nowrap">Percentage</th>
+                                        <th class="py-2 px-1 sm:p-2.5 font-bold whitespace-nowrap">Result</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -332,29 +336,30 @@ if uploaded_files:
                     </div>
                     
                     <!-- FOOTER -->
-                    <div class="text-center text-[8px] sm:text-[10px] font-black text-gray-500 uppercase tracking-widest border-t-2 border-gray-300 pt-4 pb-2 mt-4">
+                    <div class="text-center text-[7px] sm:text-[10px] font-black text-gray-500 uppercase tracking-widest border-t-2 border-gray-300 pt-3 pb-1 mt-2">
                         © ATOM ACADEMY | GENERATED VIA OFFICIAL PORTAL | DO NOT DISTRIBUTE WITHOUT PERMISSION
                     </div>
                 </div>
             </div>
 
             <!-- PREMIUM BUTTONS: SIDE-BY-SIDE AT BOTTOM LEFT -->
-            <div class="max-w-4xl mx-auto mt-6 flex flex-row flex-wrap justify-start gap-4 hide-print w-full">
+            <div class="max-w-5xl mx-auto mt-4 flex flex-row flex-wrap justify-start gap-3 w-full">
                 <!-- PDF BUTTON -->
-                <button onclick="generatePDF()" id="downloadPdfBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-black shadow-md transition-all duration-200 flex items-center justify-center gap-2 text-sm uppercase tracking-widest border-2 border-indigo-800 active:scale-95 flex-1 sm:flex-none min-w-[200px]">
-                    <i class="fas fa-file-pdf text-xl"></i> DOWNLOAD PDF
+                <button onclick="generatePDF()" id="downloadPdfBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl font-black shadow-md transition-all duration-200 flex items-center justify-center gap-2 text-xs sm:text-sm uppercase tracking-widest border-2 border-indigo-800 active:scale-95 flex-1 sm:flex-none">
+                    <i class="fas fa-file-pdf text-lg"></i> DOWNLOAD PDF
                 </button>
                 
                 <!-- CSV BUTTON -->
-                <button onclick="downloadCSV()" id="downloadCsvBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl font-black shadow-md transition-all duration-200 flex items-center justify-center gap-2 text-sm uppercase tracking-widest border-2 border-emerald-800 active:scale-95 flex-1 sm:flex-none min-w-[200px]">
-                    <i class="fas fa-file-excel text-xl"></i> DOWNLOAD CSV
+                <button onclick="downloadCSV()" id="downloadCsvBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl font-black shadow-md transition-all duration-200 flex items-center justify-center gap-2 text-xs sm:text-sm uppercase tracking-widest border-2 border-emerald-800 active:scale-95 flex-1 sm:flex-none">
+                    <i class="fas fa-file-excel text-lg"></i> DOWNLOAD CSV
                 </button>
             </div>
 
             <script>
-                // --- CSV DOWNLOAD LOGIC (NO REFRESH) ---
                 const csvBase64 = "{csv_b64}";
+                const pdfData = {pdf_rows_json};
                 
+                // --- CSV DOWNLOAD LOGIC ---
                 function downloadCSV() {{
                     const csvStr = atob(csvBase64);
                     const blob = new Blob([csvStr], {{ type: 'text/csv;charset=utf-8;' }});
@@ -367,89 +372,184 @@ if uploaded_files:
                     document.body.removeChild(link);
                 }}
 
-                // --- PDF DOWNLOAD LOGIC ---
+                // --- PURE VECTOR PDF GENERATOR (NO CUT-OFF, NO MOBILE CRASH) ---
                 function generatePDF() {{
                     const btn = document.getElementById('downloadPdfBtn');
                     const origText = btn.innerHTML;
-                    btn.innerHTML = '<i class="fas fa-spinner fa-spin text-xl"></i> PROCESSING...';
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin text-lg"></i> SAVING PDF...';
                     btn.disabled = true;
-                    btn.classList.add('opacity-75', 'cursor-not-allowed');
 
-                    const element = document.getElementById('pdf-content');
-                    const scrollContainer = document.getElementById('table-scroll-container');
-                    
-                    // SAFEGUARD FOR CUT-OFFS: Backup original styles
-                    const origWidth = element.style.width;
-                    const origMaxW = element.style.maxWidth;
-                    const origMargin = element.style.margin;
+                    try {{
+                        const {{ jsPDF }} = window.jspdf;
+                        // Exact A4 Portrait (210mm x 297mm)
+                        const doc = new jsPDF({{ orientation: 'portrait', unit: 'mm', format: 'a4' }});
 
-                    // FIX PC LEFT CUT-OFF: Temporarily force exact width and align left
-                    element.style.width = '1000px';
-                    element.style.maxWidth = '1000px';
-                    element.style.margin = '0';
-                    
-                    // FIX MOBILE/PC SCROLL CLIPPING
-                    if (scrollContainer) {{
-                        scrollContainer.classList.remove('overflow-x-auto');
-                        scrollContainer.style.overflowX = 'visible';
-                    }}
-                    
-                    // Ensure window is scrolled to top to prevent weird blank spaces
-                    window.scrollTo(0,0);
-                    
-                    // DYNAMIC SCALE FOR MOBILE CRASH FIX
-                    const isMobile = window.innerWidth < 768;
-                    const pdfScale = isMobile ? 1.2 : 2; // Lower scale on mobile saves memory from crashing!
+                        // 1. TOP HEADER CARD ON PAGE 1
+                        doc.setDrawColor(229, 231, 235);
+                        doc.setFillColor(255, 255, 255);
+                        doc.roundedRect(10, 10, 190, 20, 3, 3, 'FD');
 
-                    const opt = {{
-                        margin:       [10, 5, 10, 5],
-                        filename:     'MKBU_Merit_List.pdf',
-                        image:        {{ type: 'jpeg', quality: 0.90 }}, 
-                        html2canvas:  {{ 
-                            scale: pdfScale, 
-                            useCORS: true, 
-                            letterRendering: true, 
-                            scrollY: 0, 
-                            scrollX: 0,
-                            windowWidth: 1000 
-                        }},
-                        jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'portrait' }},
-                        pagebreak:    {{ mode: ['css', 'legacy'], avoid: 'tr' }} 
-                    }};
-                    
-                    html2pdf().set(opt).from(element).save().then(() => {{
-                        // RESTORE EVERYTHING TO NORMAL
-                        element.style.width = origWidth;
-                        element.style.maxWidth = origMaxW;
-                        element.style.margin = origMargin;
-                        
-                        if (scrollContainer) {{
-                            scrollContainer.classList.add('overflow-x-auto');
-                            scrollContainer.style.overflowX = '';
+                        doc.setFont('helvetica', 'bold');
+                        doc.setFontSize(15);
+                        doc.setTextColor(30, 27, 75); // Indigo-950
+                        doc.text('FINAL MERIT LIST', 15, 19);
+
+                        doc.setFontSize(8.5);
+                        doc.setTextColor(22, 163, 74); // Green-600
+                        doc.text('Sorted by Highest Percentage', 15, 25);
+
+                        doc.setFontSize(7);
+                        doc.setTextColor(156, 163, 175); // Gray-400
+                        doc.text('GENERATED BY', 195, 18, {{ align: 'right' }});
+
+                        doc.setFontSize(10);
+                        doc.setTextColor(55, 48, 163); // Indigo-800
+                        doc.text('ATOM ACADEMY', 195, 24, {{ align: 'right' }});
+
+                        // 2. PREPARE TABLE ROWS
+                        const tableBody = pdfData.map(r => [
+                            r.rank <= 3 ? String(r.rank) : '#' + r.rank,
+                            '', // Status icon drawn via vector
+                            r.dept,
+                            r.seat,
+                            r.name,
+                            r.marks,
+                            r.perc,
+                            r.status
+                        ]);
+
+                        // 3. GENERATE AUTO-PAGINATING PORTRAIT TABLE (Exact 190mm total width)
+                        doc.autoTable({{
+                            startY: 34,
+                            margin: {{ top: 15, bottom: 20, left: 10, right: 10 }},
+                            head: [['RANK', 'STATUS', 'DEPT', 'SEAT NO', 'STUDENT NAME', 'MARKS', 'PERCENTAGE', 'RESULT']],
+                            body: tableBody,
+                            theme: 'grid',
+                            rowPageBreak: 'avoid',
+                            headStyles: {{
+                                fillColor: [241, 245, 249],
+                                textColor: [55, 65, 81],
+                                fontStyle: 'bold',
+                                fontSize: 8,
+                                halign: 'left',
+                                lineColor: [226, 232, 240],
+                                lineWidth: 0.3
+                            }},
+                            styles: {{
+                                font: 'helvetica',
+                                fontSize: 8,
+                                cellPadding: 2.5,
+                                textColor: [17, 24, 39],
+                                lineColor: [229, 231, 235],
+                                lineWidth: 0.2,
+                                valign: 'middle',
+                                overflow: 'linebreak'
+                            }},
+                            columnStyles: {{
+                                0: {{ cellWidth: 14, halign: 'center', fontStyle: 'bold' }},
+                                1: {{ cellWidth: 15, halign: 'center' }},
+                                2: {{ cellWidth: 23, halign: 'center', fontStyle: 'bold', fontSize: 7.5 }},
+                                3: {{ cellWidth: 21, fontStyle: 'normal', textColor: [75, 85, 99] }},
+                                4: {{ cellWidth: 57, fontStyle: 'bold' }},
+                                5: {{ cellWidth: 20, halign: 'center', fontStyle: 'bold' }},
+                                6: {{ cellWidth: 23, halign: 'center', fontStyle: 'bold', textColor: [37, 99, 235], fontSize: 8.5 }},
+                                7: {{ cellWidth: 17, halign: 'center', fontStyle: 'bold', fontSize: 7 }}
+                            }},
+                            didParseCell: function(data) {{
+                                if (data.section === 'head' && (data.column.index <= 2 || data.column.index >= 5)) {{
+                                    data.cell.styles.halign = 'center';
+                                }}
+                                if (data.section === 'body') {{
+                                    // Top 3 Rank Colors
+                                    if (data.column.index === 0) {{
+                                        const r = pdfData[data.row.index].rank;
+                                        if (r === 1) data.cell.styles.textColor = [217, 119, 6]; // Gold
+                                        else if (r === 2) data.cell.styles.textColor = [107, 114, 128]; // Silver
+                                        else if (r === 3) data.cell.styles.textColor = [234, 88, 12]; // Bronze
+                                    }}
+                                    // Dept Pill Colors
+                                    if (data.column.index === 2) {{
+                                        data.cell.styles.textColor = [157, 23, 77];
+                                    }}
+                                }}
+                            }},
+                            didDrawCell: function(data) {{
+                                if (data.section === 'body' && data.column.index === 1) {{
+                                    // Draw Vector Status Circle Badge (Green for PASS, Red for FAIL/ATKT, Yellow otherwise)
+                                    const st = pdfData[data.row.index].status;
+                                    const cx = data.cell.x + data.cell.width / 2;
+                                    const cy = data.cell.y + data.cell.height / 2;
+                                    
+                                    if (st.includes('PASS')) {{
+                                        doc.setFillColor(34, 197, 94); // Green
+                                        doc.circle(cx, cy, 2.5, 'F');
+                                        doc.setDrawColor(255, 255, 255);
+                                        doc.setLineWidth(0.5);
+                                        doc.line(cx - 1.1, cy + 0.1, cx - 0.3, cy + 0.9);
+                                        doc.line(cx - 0.3, cy + 0.9, cx + 1.2, cy - 0.8);
+                                    }} else if (st.includes('FAIL') || st.includes('ATKT')) {{
+                                        doc.setFillColor(239, 68, 68); // Red
+                                        doc.circle(cx, cy, 2.5, 'F');
+                                        doc.setDrawColor(255, 255, 255);
+                                        doc.setLineWidth(0.5);
+                                        doc.line(cx - 1, cy - 1, cx + 1, cy + 1);
+                                        doc.line(cx + 1, cy - 1, cx - 1, cy + 1);
+                                    }} else {{
+                                        doc.setFillColor(234, 179, 8); // Yellow
+                                        doc.circle(cx, cy, 2.5, 'F');
+                                        doc.setTextColor(255, 255, 255);
+                                        doc.setFontSize(7);
+                                        doc.text('!', cx, cy + 1, {{ align: 'center' }});
+                                    }}
+                                }}
+                            }}
+                        }});
+
+                        // 4. ADD WATERMARK & FOOTER ON EVERY PAGE
+                        const pageCount = doc.internal.getNumberOfPages();
+                        for (let i = 1; i <= pageCount; i++) {{
+                            doc.setPage(i);
+                            
+                            // Diagonal Watermark Grid
+                            doc.saveGraphicsState();
+                            if (doc.GState) {{
+                                doc.setGState(new doc.GState({{ opacity: 0.09 }}));
+                            }}
+                            doc.setFont('helvetica', 'bold');
+                            doc.setFontSize(34);
+                            doc.setTextColor(99, 102, 241); // Indigo
+                            
+                            for (let y = 70; y <= 260; y += 85) {{
+                                doc.text('ATOM ACADEMY', 65, y, {{ angle: 35, align: 'center' }});
+                                doc.text('ATOM ACADEMY', 155, y + 35, {{ angle: 35, align: 'center' }});
+                            }}
+                            doc.restoreGraphicsState();
+
+                            // Bottom Copyright Footer
+                            doc.setDrawColor(209, 213, 219);
+                            doc.setLineWidth(0.4);
+                            doc.line(10, 285, 200, 285);
+                            
+                            doc.setFont('helvetica', 'bold');
+                            doc.setFontSize(7);
+                            doc.setTextColor(107, 114, 128);
+                            doc.text('© ATOM ACADEMY | GENERATED VIA OFFICIAL PORTAL | DO NOT DISTRIBUTE WITHOUT PERMISSION', 10, 290);
+                            doc.text('Page ' + i + ' of ' + pageCount, 200, 290, {{ align: 'right' }});
                         }}
-                        
+
+                        // 5. SAVE PDF INSTANTLY (Works on both Mobile & PC)
+                        doc.save('MKBU_Merit_List.pdf');
+
                         btn.innerHTML = origText;
                         btn.disabled = false;
-                        btn.classList.remove('opacity-75', 'cursor-not-allowed');
-                    }}).catch(err => {{
-                        // RESTORE ON ERROR TOO
-                        element.style.width = origWidth;
-                        element.style.maxWidth = origMaxW;
-                        element.style.margin = origMargin;
-                        
-                        if (scrollContainer) {{
-                            scrollContainer.classList.add('overflow-x-auto');
-                            scrollContainer.style.overflowX = '';
-                        }}
-                        
+                    }} catch (err) {{
                         console.error(err);
                         btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ERROR';
                         setTimeout(() => {{
                             btn.innerHTML = origText;
                             btn.disabled = false;
-                            btn.classList.remove('opacity-75', 'cursor-not-allowed');
                         }}, 3000);
-                    }});
+                    }}
                 }}
             </script>
         </body>
