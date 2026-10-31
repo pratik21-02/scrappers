@@ -225,7 +225,6 @@ if uploaded_files:
         display_df = df[["Rank", "Course", "Seat No", "Name", "Marks", "Percentage Str", "Status"]].copy()
         display_df.columns = ["Rank", "Department", "Seat Number", "Student Name", "Marks", "Percentage", "Result Status"]
         csv_string = display_df.to_csv(index=False)
-        # Encode CSV to Base64 to safely pass it to JavaScript
         csv_b64 = base64.b64encode(csv_string.encode('utf-8')).decode('utf-8')
         
         # 3.1 HTML UI GENERATOR
@@ -274,7 +273,6 @@ if uploaded_files:
                 @media print {{
                     .hide-print {{ display: none !important; }}
                 }}
-                /* Force table to fit in width during generation */
                 table {{ table-layout: auto; width: 100%; }}
                 
                 /* THE MAGIC FIX FOR PAGE BREAK CUTS */
@@ -311,7 +309,6 @@ if uploaded_files:
                         </div>
                     </div>
                     
-                    <!-- WRAPPED IN OVERFLOW-X-AUTO TO FIX MOBILE PREVIEW SQUISH ISSUE -->
                     <div id="table-parent" class="bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 overflow-hidden mb-8 w-full">
                         <div id="table-scroll-container" class="overflow-x-auto w-full pb-2">
                             <table class="w-full text-left border-collapse">
@@ -359,7 +356,7 @@ if uploaded_files:
                 const csvBase64 = "{csv_b64}";
                 
                 function downloadCSV() {{
-                    const csvStr = atob(csvBase64); // Decode Base64
+                    const csvStr = atob(csvBase64);
                     const blob = new Blob([csvStr], {{ type: 'text/csv;charset=utf-8;' }});
                     const url = URL.createObjectURL(blob);
                     const link = document.createElement('a');
@@ -380,53 +377,69 @@ if uploaded_files:
 
                     const element = document.getElementById('pdf-content');
                     const scrollContainer = document.getElementById('table-scroll-container');
-                    const tableParent = document.getElementById('table-parent');
                     
-                    // SMART HACK: Temporary remove overflow to prevent PDF cutoff on PC and mobile
+                    // SAFEGUARD FOR CUT-OFFS: Backup original styles
+                    const origWidth = element.style.width;
+                    const origMaxW = element.style.maxWidth;
+                    const origMargin = element.style.margin;
+
+                    // FIX PC LEFT CUT-OFF: Temporarily force exact width and align left
+                    element.style.width = '1000px';
+                    element.style.maxWidth = '1000px';
+                    element.style.margin = '0';
+                    
+                    // FIX MOBILE/PC SCROLL CLIPPING
                     if (scrollContainer) {{
                         scrollContainer.classList.remove('overflow-x-auto');
-                        scrollContainer.classList.add('overflow-visible');
-                    }}
-                    if (tableParent) {{
-                        tableParent.classList.remove('overflow-hidden');
+                        scrollContainer.style.overflowX = 'visible';
                     }}
                     
+                    // Ensure window is scrolled to top to prevent weird blank spaces
+                    window.scrollTo(0,0);
+                    
+                    // DYNAMIC SCALE FOR MOBILE CRASH FIX
+                    const isMobile = window.innerWidth < 768;
+                    const pdfScale = isMobile ? 1.2 : 2; // Lower scale on mobile saves memory from crashing!
+
                     const opt = {{
                         margin:       [10, 5, 10, 5],
                         filename:     'MKBU_Merit_List.pdf',
-                        image:        {{ type: 'jpeg', quality: 0.95 }}, // Optimized for mobile memory
+                        image:        {{ type: 'jpeg', quality: 0.90 }}, 
                         html2canvas:  {{ 
-                            scale: 2, 
+                            scale: pdfScale, 
                             useCORS: true, 
                             letterRendering: true, 
                             scrollY: 0, 
-                            windowWidth: 1024 // Forces desktop rendering width to avoid clipping
+                            scrollX: 0,
+                            windowWidth: 1000 
                         }},
                         jsPDF:        {{ unit: 'mm', format: 'a4', orientation: 'portrait' }},
                         pagebreak:    {{ mode: ['css', 'legacy'], avoid: 'tr' }} 
                     }};
                     
                     html2pdf().set(opt).from(element).save().then(() => {{
-                        // Restore overflow instantly after save
+                        // RESTORE EVERYTHING TO NORMAL
+                        element.style.width = origWidth;
+                        element.style.maxWidth = origMaxW;
+                        element.style.margin = origMargin;
+                        
                         if (scrollContainer) {{
                             scrollContainer.classList.add('overflow-x-auto');
-                            scrollContainer.classList.remove('overflow-visible');
-                        }}
-                        if (tableParent) {{
-                            tableParent.classList.add('overflow-hidden');
+                            scrollContainer.style.overflowX = '';
                         }}
                         
                         btn.innerHTML = origText;
                         btn.disabled = false;
                         btn.classList.remove('opacity-75', 'cursor-not-allowed');
                     }}).catch(err => {{
-                        // Restore even on error
+                        // RESTORE ON ERROR TOO
+                        element.style.width = origWidth;
+                        element.style.maxWidth = origMaxW;
+                        element.style.margin = origMargin;
+                        
                         if (scrollContainer) {{
                             scrollContainer.classList.add('overflow-x-auto');
-                            scrollContainer.classList.remove('overflow-visible');
-                        }}
-                        if (tableParent) {{
-                            tableParent.classList.add('overflow-hidden');
+                            scrollContainer.style.overflowX = '';
                         }}
                         
                         console.error(err);
